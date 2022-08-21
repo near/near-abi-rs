@@ -167,7 +167,7 @@ mod borsh_clone {
     pub fn clone_definition(definition: &Definition) -> Definition {
         match definition {
             Definition::Array { length, elements } => Definition::Array {
-                length: length.clone(),
+                length: *length,
                 elements: elements.clone(),
             },
             Definition::Sequence { elements } => Definition::Sequence {
