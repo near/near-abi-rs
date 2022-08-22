@@ -1,8 +1,9 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
-
 use super::{AbiEntry, AbiFunction, RootSchema, SCHEMA_VERSION};
+
+pub use schemars;
+use serde::{Deserialize, Serialize};
 
 /// Core ABI information, with schema version and identity hash.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
+use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
+use schemars::schema::{RootSchema, Schema};
+use serde::{Deserialize, Serialize};
+
 #[doc(hidden)]
 #[cfg(feature = "__chunked-entries")]
 #[path = "private.rs"]
 pub mod __private;
-
-use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
-use schemars::schema::{RootSchema, Schema};
-use serde::{Deserialize, Serialize};
 
 /// Current version of the ABI schema format.
 pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
