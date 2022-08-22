@@ -1,12 +1,16 @@
-use std::collections::{HashMap, HashSet};
-use std::fmt;
+use std::collections::HashMap;
+
+#[cfg(feature = "chunked-entries")]
+mod private;
+#[cfg(feature = "chunked-entries")]
+pub use private::{AbiCombineError, AbiCombineErrorKind, ChunkedAbiEntry};
 
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
 use serde::{Deserialize, Serialize};
 
 /// Current version of the ABI schema format.
-const ABI_SCHEMA_SEMVER: &str = env!("CARGO_PKG_VERSION");
+pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -20,8 +24,8 @@ pub struct AbiRoot {
 }
 
 impl AbiRoot {
-    #[cfg(feature = "versioned-entries")]
-    pub fn new(metadata: AbiMetadata, versioned_abi: VersionedAbiEntry) -> AbiRoot {
+    #[cfg(feature = "chunked-entries")]
+    pub fn new(metadata: AbiMetadata, versioned_abi: ChunkedAbiEntry) -> AbiRoot {
         AbiRoot {
             abi_schema_version: versioned_abi.abi_schema_version,
             metadata,
@@ -57,119 +61,6 @@ pub struct AbiEntry {
     pub functions: Vec<AbiFunction>,
     /// Root JSON Schema containing all types referenced in the functions.
     pub root_schema: RootSchema,
-}
-
-/// Core ABI information, with schema version.
-#[cfg(feature = "versioned-entries")]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct VersionedAbiEntry {
-    /// Semver of the ABI schema format.
-    abi_schema_version: String,
-    #[serde(flatten)]
-    pub abi: AbiEntry,
-}
-
-#[cfg(feature = "versioned-entries")]
-impl VersionedAbiEntry {
-    pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> VersionedAbiEntry {
-        Self {
-            abi_schema_version: ABI_SCHEMA_SEMVER.to_string(),
-            abi: AbiEntry {
-                functions,
-                root_schema,
-            },
-        }
-    }
-
-    pub fn combine<I: IntoIterator<Item = VersionedAbiEntry>>(
-        entries: I,
-    ) -> Result<VersionedAbiEntry, AbiCombineError> {
-        let mut abi_schema_version = None;
-        let mut functions = Vec::<AbiFunction>::new();
-        let mut gen = schemars::gen::SchemaGenerator::default();
-        let definitions = gen.definitions_mut();
-
-        let mut unexpected_versions = HashSet::new();
-
-        for entry in entries {
-            if let Some(ref abi_schema_version) = abi_schema_version {
-                // should probably only disallow major version mismatch
-                if abi_schema_version != &entry.abi_schema_version {
-                    unexpected_versions.insert(entry.abi_schema_version.clone());
-                    continue;
-                }
-            } else {
-                abi_schema_version = Some(entry.abi_schema_version);
-            }
-
-            // Update resulting JSON Schema
-            definitions.extend(entry.abi.root_schema.definitions.to_owned());
-
-            // Update resulting function list
-            functions.extend(entry.abi.functions);
-        }
-
-        if !unexpected_versions.is_empty() {
-            return Err(AbiCombineError {
-                kind: AbiCombineErrorKind::SchemaVersionConflict {
-                    expected: abi_schema_version.unwrap(),
-                    found: unexpected_versions.into_iter().collect(),
-                },
-            });
-        }
-
-        // Sort the function list for readability
-        functions.sort_by(|x, y| x.name.cmp(&y.name));
-
-        Ok(VersionedAbiEntry {
-            abi_schema_version: abi_schema_version.unwrap(),
-            abi: AbiEntry {
-                functions,
-                root_schema: gen.into_root_schema_for::<String>(),
-            },
-        })
-    }
-}
-
-#[derive(Eq, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct AbiCombineError {
-    #[serde(flatten)]
-    kind: AbiCombineErrorKind,
-}
-
-impl AbiCombineError {
-    pub fn kind(&self) -> &AbiCombineErrorKind {
-        &self.kind
-    }
-}
-
-impl std::error::Error for AbiCombineError {}
-impl fmt::Display for AbiCombineError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.kind.fmt(f)
-    }
-}
-
-#[derive(Eq, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum AbiCombineErrorKind {
-    SchemaVersionConflict {
-        expected: String,
-        found: Vec<String>,
-    },
-}
-
-impl fmt::Display for AbiCombineErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AbiCombineErrorKind::SchemaVersionConflict { expected, found } => format!(
-                "ABI schema version conflict: expected {}, found {}",
-                expected,
-                found.join(", ")
-            )
-            .fmt(f),
-        }
-    }
 }
 
 /// ABI of a single function.
@@ -276,7 +167,7 @@ mod borsh_clone {
     pub fn clone_definition(definition: &Definition) -> Definition {
         match definition {
             Definition::Array { length, elements } => Definition::Array {
-                length: length.clone(),
+                length: *length,
                 elements: elements.clone(),
             },
             Definition::Sequence { elements } => Definition::Sequence {
