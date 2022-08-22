@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-#[cfg(feature = "chunked-entries")]
-mod private;
-#[cfg(feature = "chunked-entries")]
-pub use private::{AbiCombineError, AbiCombineErrorKind, ChunkedAbiEntry};
+#[doc(hidden)]
+#[cfg(feature = "__chunked-entries")]
+#[path = "private.rs"]
+pub mod __private;
 
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
@@ -24,8 +24,8 @@ pub struct AbiRoot {
 }
 
 impl AbiRoot {
-    #[cfg(feature = "chunked-entries")]
-    pub fn new(metadata: AbiMetadata, versioned_abi: ChunkedAbiEntry) -> AbiRoot {
+    #[cfg(feature = "__chunked-entries")]
+    pub fn new(metadata: AbiMetadata, versioned_abi: __private::ChunkedAbiEntry) -> AbiRoot {
         AbiRoot {
             abi_schema_version: versioned_abi.abi_schema_version,
             metadata,
