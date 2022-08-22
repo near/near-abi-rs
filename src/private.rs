@@ -9,20 +9,14 @@ use super::{AbiEntry, AbiFunction, RootSchema, SCHEMA_VERSION};
 pub struct ChunkedAbiEntry {
     /// Semver of the ABI schema format.
     pub(crate) abi_schema_version: String,
-    pub source_hash: u64,
     #[serde(flatten)]
     pub abi: AbiEntry,
 }
 
 impl ChunkedAbiEntry {
-    pub fn new(
-        source_hash: u64,
-        functions: Vec<AbiFunction>,
-        root_schema: RootSchema,
-    ) -> ChunkedAbiEntry {
+    pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> ChunkedAbiEntry {
         Self {
             abi_schema_version: SCHEMA_VERSION.to_string(),
-            source_hash,
             abi: AbiEntry {
                 functions,
                 root_schema,
@@ -35,7 +29,6 @@ impl ChunkedAbiEntry {
     ) -> Result<ChunkedAbiEntry, AbiCombineError> {
         let mut abi_schema_version = None;
         let mut functions = Vec::<AbiFunction>::new();
-        let mut source_hash = None;
 
         let mut gen = schemars::gen::SchemaGenerator::default();
         let definitions = gen.definitions_mut();
@@ -51,15 +44,6 @@ impl ChunkedAbiEntry {
                 }
             } else {
                 abi_schema_version = Some(entry.abi_schema_version);
-            }
-            if let Some(ref source_hash) = source_hash {
-                if source_hash != &entry.source_hash {
-                    return Err(AbiCombineError {
-                        kind: AbiCombineErrorKind::SourceConflict,
-                    });
-                }
-            } else {
-                source_hash = Some(entry.source_hash);
             }
 
             // Update resulting JSON Schema
@@ -83,7 +67,6 @@ impl ChunkedAbiEntry {
 
         Ok(ChunkedAbiEntry {
             abi_schema_version: abi_schema_version.unwrap(),
-            source_hash: source_hash.unwrap(),
             abi: AbiEntry {
                 functions,
                 root_schema: gen.into_root_schema_for::<String>(),
@@ -118,7 +101,6 @@ pub enum AbiCombineErrorKind {
         expected: String,
         found: Vec<String>,
     },
-    SourceConflict,
 }
 
 impl fmt::Display for AbiCombineErrorKind {
@@ -130,7 +112,6 @@ impl fmt::Display for AbiCombineErrorKind {
                 found.join(", ")
             )
             .fmt(f),
-            Self::SourceConflict => "ABI entry source conflict".fmt(f),
         }
     }
 }
