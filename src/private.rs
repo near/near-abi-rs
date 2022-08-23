@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{AbiEntry, AbiFunction, RootSchema, SCHEMA_VERSION};
+use super::{AbiEntry, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION};
 
 pub use schemars;
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ChunkedAbiEntry {
     /// Semver of the ABI schema format.
-    pub(crate) abi_schema_version: String,
+    pub abi_schema_version: String,
     #[serde(flatten)]
     pub abi: AbiEntry,
 }
@@ -73,6 +73,14 @@ impl ChunkedAbiEntry {
                 root_schema: gen.into_root_schema_for::<String>(),
             },
         })
+    }
+
+    pub fn into_abi_root(self, metadata: AbiMetadata) -> AbiRoot {
+        AbiRoot {
+            abi_schema_version: self.abi_schema_version,
+            metadata,
+            abi: self.abi,
+        }
     }
 }
 

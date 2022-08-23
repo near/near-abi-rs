@@ -16,26 +16,11 @@ pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
-    abi_schema_version: String,
+    pub abi_schema_version: String,
     /// Metadata information about the contract.
     pub metadata: AbiMetadata,
     /// Core ABI information (functions and types).
     pub abi: AbiEntry,
-}
-
-impl AbiRoot {
-    #[cfg(feature = "__chunked-entries")]
-    pub fn new(metadata: AbiMetadata, versioned_abi: __private::ChunkedAbiEntry) -> AbiRoot {
-        AbiRoot {
-            abi_schema_version: versioned_abi.abi_schema_version,
-            metadata,
-            abi: versioned_abi.abi,
-        }
-    }
-
-    pub fn schema_version(&self) -> &str {
-        &self.abi_schema_version
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
