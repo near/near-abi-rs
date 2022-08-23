@@ -34,7 +34,7 @@ impl ChunkedAbiEntry {
         let mut gen = schemars::gen::SchemaGenerator::default();
         let definitions = gen.definitions_mut();
 
-        let mut unexpected_versions = std::collections::HashSet::new();
+        let mut unexpected_versions = std::collections::BTreeSet::new();
 
         for entry in entries {
             if let Some(ref abi_schema_version) = abi_schema_version {
