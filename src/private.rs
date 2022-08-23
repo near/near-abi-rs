@@ -2,7 +2,6 @@ use std::fmt;
 
 use super::{AbiEntry, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION};
 
-pub use schemars;
 use serde::{Deserialize, Serialize};
 
 /// Core ABI information, with schema version and identity hash.
