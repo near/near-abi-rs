@@ -1,23 +1,24 @@
-use std::fmt;
-
-use super::{AbiEntry, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION};
-
+use super::{
+    ensure_current_version, AbiBody, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION,
+};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Core ABI information, with schema version and identity hash.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ChunkedAbiEntry {
     /// Semver of the ABI schema format.
+    #[serde(deserialize_with = "ensure_current_version")]
     pub schema_version: String,
     #[serde(flatten)]
-    pub abi: AbiEntry,
+    pub body: AbiBody,
 }
 
 impl ChunkedAbiEntry {
     pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> ChunkedAbiEntry {
         Self {
             schema_version: SCHEMA_VERSION.to_string(),
-            abi: AbiEntry {
+            body: AbiBody {
                 functions,
                 root_schema,
             },
@@ -47,10 +48,10 @@ impl ChunkedAbiEntry {
             }
 
             // Update resulting JSON Schema
-            definitions.extend(entry.abi.root_schema.definitions.to_owned());
+            definitions.extend(entry.body.root_schema.definitions.to_owned());
 
             // Update resulting function list
-            functions.extend(entry.abi.functions);
+            functions.extend(entry.body.functions);
         }
 
         if !unexpected_versions.is_empty() {
@@ -67,7 +68,7 @@ impl ChunkedAbiEntry {
 
         Ok(ChunkedAbiEntry {
             schema_version: schema_version.unwrap(),
-            abi: AbiEntry {
+            body: AbiBody {
                 functions,
                 root_schema: gen.into_root_schema_for::<String>(),
             },
@@ -78,7 +79,7 @@ impl ChunkedAbiEntry {
         AbiRoot {
             schema_version: self.schema_version,
             metadata,
-            abi: self.abi,
+            body: self.body,
         }
     }
 }

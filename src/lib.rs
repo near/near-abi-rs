@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
-use serde::{Deserialize, Serialize};
+use semver::Version;
+use serde::{de, Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
 
 #[doc(hidden)]
 #[cfg(feature = "__chunked-entries")]
@@ -10,18 +10,41 @@ use serde::{Deserialize, Serialize};
 pub mod __private;
 
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const SCHEMA_VERSION_MAJOR: u64 = 0;
+pub const SCHEMA_VERSION_MINOR: u64 = 1;
+pub const SCHEMA_VERSION: &str = "0.1.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
-    #[serde(rename = "abi_schema_version")]
+    #[serde(deserialize_with = "ensure_current_version")]
     pub schema_version: String,
     /// Metadata information about the contract.
     pub metadata: AbiMetadata,
     /// Core ABI information (functions and types).
-    pub abi: AbiEntry,
+    pub body: AbiBody,
+}
+
+fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let unchecked = String::deserialize(d)?;
+    let version = Version::parse(&unchecked)
+        .map_err(|_| de::Error::custom("expected `schema_version` to be a valid semver value"))?;
+    if version.major != SCHEMA_VERSION_MAJOR || version.minor != SCHEMA_VERSION_MINOR {
+        let expected_version = Version::parse(SCHEMA_VERSION).unwrap();
+        if version < expected_version {
+            return Err(de::Error::custom(format!(
+                "expected `schema_version` to be ~{}.{}, but got {}: consider re-generating your ABI file with a newer version of SDK and cargo-near",
+                SCHEMA_VERSION_MAJOR, SCHEMA_VERSION_MINOR, version
+            )));
+        } else {
+            return Err(de::Error::custom(format!(
+                "expected `schema_version` to be ~{}.{}, but got {}: consider upgrading near-abi to a newer version",
+                SCHEMA_VERSION_MAJOR, SCHEMA_VERSION_MINOR, version
+            )));
+        }
+    }
+    Ok(unchecked)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
@@ -42,7 +65,7 @@ pub struct AbiMetadata {
 
 /// Core ABI information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct AbiEntry {
+pub struct AbiBody {
     /// ABIs of all contract's functions.
     pub functions: Vec<AbiFunction>,
     /// Root JSON Schema containing all types referenced in the functions.

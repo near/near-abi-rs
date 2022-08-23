@@ -9,6 +9,7 @@ description = "NEAR smart contract ABI primitives"
 
 [dependencies]
 borsh = { version = "0.9", features = ["const-generics"] }
+semver = "1"
 serde = { version = "1", features = ["derive"] }
 schemars = "0.8.8"
 
