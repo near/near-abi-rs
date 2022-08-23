@@ -16,7 +16,8 @@ pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
-    pub abi_schema_version: String,
+    #[serde(rename = "abi_schema_version")]
+    pub schema_version: String,
     /// Metadata information about the contract.
     pub metadata: AbiMetadata,
     /// Core ABI information (functions and types).

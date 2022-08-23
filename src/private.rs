@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ChunkedAbiEntry {
     /// Semver of the ABI schema format.
-    pub abi_schema_version: String,
+    pub schema_version: String,
     #[serde(flatten)]
     pub abi: AbiEntry,
 }
@@ -17,7 +17,7 @@ pub struct ChunkedAbiEntry {
 impl ChunkedAbiEntry {
     pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> ChunkedAbiEntry {
         Self {
-            abi_schema_version: SCHEMA_VERSION.to_string(),
+            schema_version: SCHEMA_VERSION.to_string(),
             abi: AbiEntry {
                 functions,
                 root_schema,
@@ -28,7 +28,7 @@ impl ChunkedAbiEntry {
     pub fn combine<I: IntoIterator<Item = ChunkedAbiEntry>>(
         entries: I,
     ) -> Result<ChunkedAbiEntry, AbiCombineError> {
-        let mut abi_schema_version = None;
+        let mut schema_version = None;
         let mut functions = Vec::<AbiFunction>::new();
 
         let mut gen = schemars::gen::SchemaGenerator::default();
@@ -37,14 +37,14 @@ impl ChunkedAbiEntry {
         let mut unexpected_versions = std::collections::BTreeSet::new();
 
         for entry in entries {
-            if let Some(ref abi_schema_version) = abi_schema_version {
+            if let Some(ref schema_version) = schema_version {
                 // should probably only disallow major version mismatch
-                if abi_schema_version != &entry.abi_schema_version {
-                    unexpected_versions.insert(entry.abi_schema_version.clone());
+                if schema_version != &entry.schema_version {
+                    unexpected_versions.insert(entry.schema_version.clone());
                     continue;
                 }
             } else {
-                abi_schema_version = Some(entry.abi_schema_version);
+                schema_version = Some(entry.schema_version);
             }
 
             // Update resulting JSON Schema
@@ -57,7 +57,7 @@ impl ChunkedAbiEntry {
         if !unexpected_versions.is_empty() {
             return Err(AbiCombineError {
                 kind: AbiCombineErrorKind::SchemaVersionConflict {
-                    expected: abi_schema_version.unwrap(),
+                    expected: schema_version.unwrap(),
                     found: unexpected_versions.into_iter().collect(),
                 },
             });
@@ -67,7 +67,7 @@ impl ChunkedAbiEntry {
         functions.sort_by(|x, y| x.name.cmp(&y.name));
 
         Ok(ChunkedAbiEntry {
-            abi_schema_version: abi_schema_version.unwrap(),
+            schema_version: schema_version.unwrap(),
             abi: AbiEntry {
                 functions,
                 root_schema: gen.into_root_schema_for::<String>(),
@@ -77,7 +77,7 @@ impl ChunkedAbiEntry {
 
     pub fn into_abi_root(self, metadata: AbiMetadata) -> AbiRoot {
         AbiRoot {
-            abi_schema_version: self.abi_schema_version,
+            schema_version: self.schema_version,
             metadata,
             abi: self.abi,
         }
