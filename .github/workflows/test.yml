@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  msrv-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Get MSRV
+        run: |
+          RUST_MSRV="$(sed -n 's/rust-version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          echo "RUST_MSRV=$RUST_MSRV" >> $GITHUB_ENV
+
+      - name: "Install ${{ env.RUST_MSRV }} toolchain (MSRV)"
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ env.RUST_MSRV }}
+
+      - run: cargo check
+
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Run Tests
+        run: cargo test
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Check Formatting
+        run: cargo fmt -- --check
+
+      - name: Check Clippy
+        run: cargo clippy --tests -- -Dclippy::all
