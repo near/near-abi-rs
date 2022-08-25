@@ -9,9 +9,16 @@ use std::collections::HashMap;
 #[path = "private.rs"]
 pub mod __private;
 
+// Keep in sync with SCHEMA_VERSION below.
+const SCHEMA_SEMVER: Version = Version {
+    major: 0,
+    minor: 1,
+    patch: 0,
+    pre: semver::Prerelease::EMPTY,
+    build: semver::BuildMetadata::EMPTY,
+};
+
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION_MAJOR: u64 = 0;
-pub const SCHEMA_VERSION_MINOR: u64 = 1;
 pub const SCHEMA_VERSION: &str = "0.1.0";
 
 /// Contract ABI.
@@ -30,17 +37,16 @@ fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::
     let unchecked = String::deserialize(d)?;
     let version = Version::parse(&unchecked)
         .map_err(|_| de::Error::custom("expected `schema_version` to be a valid semver value"))?;
-    if version.major != SCHEMA_VERSION_MAJOR || version.minor != SCHEMA_VERSION_MINOR {
-        let expected_version = Version::parse(SCHEMA_VERSION).unwrap();
-        if version < expected_version {
+    if version.major != SCHEMA_SEMVER.major || version.minor != SCHEMA_SEMVER.minor {
+        if version < SCHEMA_SEMVER {
             return Err(de::Error::custom(format!(
                 "expected `schema_version` to be ~{}.{}, but got {}: consider re-generating your ABI file with a newer version of SDK and cargo-near",
-                SCHEMA_VERSION_MAJOR, SCHEMA_VERSION_MINOR, version
+                SCHEMA_SEMVER.major, SCHEMA_SEMVER.minor, version
             )));
         } else {
             return Err(de::Error::custom(format!(
                 "expected `schema_version` to be ~{}.{}, but got {}: consider upgrading near-abi to a newer version",
-                SCHEMA_VERSION_MAJOR, SCHEMA_VERSION_MINOR, version
+                SCHEMA_SEMVER.major, SCHEMA_SEMVER.minor, version
             )));
         }
     }
