@@ -710,4 +710,61 @@ mod tests {
         serde_json::from_str::<AbiParameter>(json)
             .expect_err("Expected deserialization to fail due to unknown field");
     }
+
+    #[test]
+    fn test_correct_version() {
+        let json = format!(
+            r#"
+            {{
+                "schema_version": "{}",
+                "metadata": {{}},
+                "body": {{
+                    "functions": [],
+                    "root_schema": {{}}
+                }}
+            }}
+            "#,
+            SCHEMA_VERSION
+        );
+        let abi_root = serde_json::from_str::<AbiRoot>(&json).unwrap();
+        assert_eq!(abi_root.schema_version, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn test_older_version() {
+        let json = r#"
+          {
+            "schema_version": "0.0.1",
+            "metadata": {},
+            "body": {
+                "functions": [],
+                "root_schema": {}
+            }
+          }
+        "#;
+        let err = serde_json::from_str::<AbiRoot>(json)
+            .expect_err("Expected deserialization to fail due to schema version mismatch");
+        assert!(err.to_string().contains(
+            "got 0.0.1: consider re-generating your ABI file with a newer version of SDK and cargo-near"
+        ));
+    }
+
+    #[test]
+    fn test_newer_version() {
+        let json = r#"
+          {
+            "schema_version": "99.99.99",
+            "metadata": {},
+            "body": {
+                "functions": [],
+                "root_schema": {}
+            }
+          }
+        "#;
+        let err = serde_json::from_str::<AbiRoot>(json)
+            .expect_err("Expected deserialization to fail due to schema version mismatch");
+        assert!(err
+            .to_string()
+            .contains("got 99.99.99: consider upgrading near-abi to a newer version"));
+    }
 }
