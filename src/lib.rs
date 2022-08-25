@@ -116,7 +116,6 @@ pub struct AbiFunction {
 
 /// Information about a single named function parameter.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct AbiParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
     pub name: String,
@@ -644,6 +643,71 @@ mod tests {
           }
         "#;
         serde_json::from_str::<AbiType>(json)
+            .expect_err("Expected deserialization to fail due to unknown field");
+    }
+
+    #[test]
+    fn test_deser_param() {
+        #[derive(BorshSchema)]
+        struct Unit;
+        let expected_param = AbiParameter {
+            name: "foo".to_string(),
+            typ: AbiType::Borsh {
+                type_schema: <Unit>::schema_container(),
+            },
+        };
+        let value = serde_json::to_value(&expected_param).unwrap();
+        let expected_json = r#"
+          {
+            "name": "foo",
+            "serialization_type": "borsh",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
+        assert_eq!(value, expected_value);
+
+        let param = serde_json::from_str::<AbiParameter>(expected_json).unwrap();
+        assert_eq!(param.name, "foo");
+        if let AbiType::Borsh { type_schema } = param.typ {
+            assert_eq!(type_schema.declaration, "Unit".to_string());
+            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(
+                type_schema.definitions.get("Unit").unwrap(),
+                &Definition::Struct {
+                    fields: Fields::Empty
+                }
+            );
+        } else {
+            panic!("Unexpected serialization type")
+        }
+    }
+
+    #[test]
+    fn test_deser_param_unknown_fields() {
+        let json = r#"
+          {
+            "name": "foo",
+            "serialization_type": "borsh",
+            "extra": "blah-blah",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        serde_json::from_str::<AbiParameter>(json)
             .expect_err("Expected deserialization to fail due to unknown field");
     }
 }
