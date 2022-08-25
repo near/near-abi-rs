@@ -23,6 +23,7 @@ pub const SCHEMA_VERSION: &str = "0.1.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
     #[serde(deserialize_with = "ensure_current_version")]
@@ -71,6 +72,7 @@ pub struct AbiMetadata {
 
 /// Core ABI information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiBody {
     /// ABIs of all contract's functions.
     pub functions: Vec<AbiFunction>,
@@ -80,6 +82,7 @@ pub struct AbiBody {
 
 /// ABI of a single function.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiFunction {
     pub name: String,
     /// Human-readable documentation parsed from the source file.
@@ -113,6 +116,7 @@ pub struct AbiFunction {
 
 /// Information about a single named function parameter.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
     pub name: String,
@@ -125,6 +129,7 @@ pub struct AbiParameter {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
+#[serde(deny_unknown_fields)]
 pub enum AbiType {
     Json {
         /// JSON Subschema that represents this type (can be an inline primitive, a reference to the root schema and a few other corner-case things).
@@ -620,5 +625,25 @@ mod tests {
         } else {
             panic!("Unexpected serialization type")
         }
+    }
+
+    #[test]
+    fn test_deser_unknown_fields() {
+        let json = r#"
+          {
+            "serialization_type": "borsh",
+            "extra": "blah-blah",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        serde_json::from_str::<AbiType>(json)
+            .expect_err("Expected deserialization to fail due to unknown field");
     }
 }
