@@ -1,27 +1,57 @@
-use std::collections::HashMap;
-
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
-use serde::{Deserialize, Serialize};
+use semver::Version;
+use serde::{de, Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
 
 #[doc(hidden)]
 #[cfg(feature = "__chunked-entries")]
 #[path = "private.rs"]
 pub mod __private;
 
+// Keep in sync with SCHEMA_VERSION below.
+const SCHEMA_SEMVER: Version = Version {
+    major: 0,
+    minor: 1,
+    patch: 0,
+    pre: semver::Prerelease::EMPTY,
+    build: semver::BuildMetadata::EMPTY,
+};
+
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const SCHEMA_VERSION: &str = "0.1.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
-    #[serde(rename = "abi_schema_version")]
+    #[serde(deserialize_with = "ensure_current_version")]
     pub schema_version: String,
     /// Metadata information about the contract.
     pub metadata: AbiMetadata,
     /// Core ABI information (functions and types).
-    pub abi: AbiEntry,
+    pub body: AbiBody,
+}
+
+fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::Error> {
+    let unchecked = String::deserialize(d)?;
+    let version = Version::parse(&unchecked)
+        .map_err(|_| de::Error::custom("expected `schema_version` to be a valid semver value"))?;
+    if version.major != SCHEMA_SEMVER.major || version.minor != SCHEMA_SEMVER.minor {
+        if version < SCHEMA_SEMVER {
+            return Err(de::Error::custom(format!(
+                "expected `schema_version` to be ~{}.{}, but got {}: consider re-generating your ABI file with a newer version of SDK and cargo-near",
+                SCHEMA_SEMVER.major, SCHEMA_SEMVER.minor, version
+            )));
+        } else {
+            return Err(de::Error::custom(format!(
+                "expected `schema_version` to be ~{}.{}, but got {}: consider upgrading near-abi to a newer version",
+                SCHEMA_SEMVER.major, SCHEMA_SEMVER.minor, version
+            )));
+        }
+    }
+    Ok(unchecked)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
@@ -42,7 +72,8 @@ pub struct AbiMetadata {
 
 /// Core ABI information.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct AbiEntry {
+#[serde(deny_unknown_fields)]
+pub struct AbiBody {
     /// ABIs of all contract's functions.
     pub functions: Vec<AbiFunction>,
     /// Root JSON Schema containing all types referenced in the functions.
@@ -51,6 +82,7 @@ pub struct AbiEntry {
 
 /// ABI of a single function.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct AbiFunction {
     pub name: String,
     /// Human-readable documentation parsed from the source file.
@@ -96,6 +128,7 @@ pub struct AbiParameter {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
+#[serde(deny_unknown_fields)]
 pub enum AbiType {
     Json {
         /// JSON Subschema that represents this type (can be an inline primitive, a reference to the root schema and a few other corner-case things).
@@ -591,5 +624,90 @@ mod tests {
         } else {
             panic!("Unexpected serialization type")
         }
+    }
+
+    #[test]
+    fn test_deser_unknown_fields() {
+        let json = r#"
+          {
+            "serialization_type": "borsh",
+            "extra": "blah-blah",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        serde_json::from_str::<AbiType>(json)
+            .expect_err("Expected deserialization to fail due to unknown field");
+    }
+
+    #[test]
+    fn test_deser_param() {
+        #[derive(BorshSchema)]
+        struct Unit;
+        let expected_param = AbiParameter {
+            name: "foo".to_string(),
+            typ: AbiType::Borsh {
+                type_schema: <Unit>::schema_container(),
+            },
+        };
+        let value = serde_json::to_value(&expected_param).unwrap();
+        let expected_json = r#"
+          {
+            "name": "foo",
+            "serialization_type": "borsh",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
+        assert_eq!(value, expected_value);
+
+        let param = serde_json::from_str::<AbiParameter>(expected_json).unwrap();
+        assert_eq!(param.name, "foo");
+        if let AbiType::Borsh { type_schema } = param.typ {
+            assert_eq!(type_schema.declaration, "Unit".to_string());
+            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(
+                type_schema.definitions.get("Unit").unwrap(),
+                &Definition::Struct {
+                    fields: Fields::Empty
+                }
+            );
+        } else {
+            panic!("Unexpected serialization type")
+        }
+    }
+
+    #[test]
+    fn test_deser_param_unknown_fields() {
+        let json = r#"
+          {
+            "name": "foo",
+            "serialization_type": "borsh",
+            "extra": "blah-blah",
+            "type_schema": {
+              "declaration": "Unit",
+              "definitions": {
+                "Unit": {
+                  "Struct": null
+                }
+              }
+            }
+          }
+        "#;
+        serde_json::from_str::<AbiParameter>(json)
+            .expect_err("Expected deserialization to fail due to unknown field");
     }
 }
