@@ -56,8 +56,6 @@ fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct BuildInfo {
-    /// The hash of the contract WASM code.
-    pub wasm_hash: String,
     /// The compiler (versioned) that was used to build the contract.
     pub compiler: String,
     /// The build tool (versioned) that was used to build the contract.
@@ -81,6 +79,8 @@ pub struct AbiMetadata {
     /// The information about how this contract was built.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<BuildInfo>,
+    /// The SHA-256 hash of the contract WASM code in Base58 format.
+    pub wasm_hash: Option<String>,
     /// Other arbitrary metadata.
     #[serde(default, flatten, skip_serializing_if = "HashMap::is_empty")]
     pub other: HashMap<String, String>,
