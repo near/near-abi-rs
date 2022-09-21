@@ -12,14 +12,14 @@ pub mod __private;
 // Keep in sync with SCHEMA_VERSION below.
 const SCHEMA_SEMVER: Version = Version {
     major: 0,
-    minor: 1,
+    minor: 2,
     patch: 0,
     pre: semver::Prerelease::EMPTY,
     build: semver::BuildMetadata::EMPTY,
 };
 
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION: &str = "0.1.0";
+pub const SCHEMA_VERSION: &str = "0.2.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
