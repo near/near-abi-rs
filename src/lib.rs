@@ -117,8 +117,8 @@ pub struct AbiFunction {
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_private: bool,
     /// Type identifiers of the function parameters.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<AbiParameter>,
+    #[serde(default, skip_serializing_if = "AbiParameters::is_empty")]
+    pub params: AbiParameters,
     /// Type identifiers of the callbacks of the function.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub callbacks: Vec<AbiType>,
@@ -130,14 +130,71 @@ pub struct AbiFunction {
     pub result: Option<AbiType>,
 }
 
-/// Information about a single named function parameter.
+/// A list of function parameters sharing the same serialization type.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-pub struct AbiParameter {
+#[serde(tag = "serialization_type")]
+#[serde(rename_all = "lowercase")]
+#[serde(deny_unknown_fields)]
+pub enum AbiParameters {
+    Json { args: Vec<AbiJsonParameter> },
+    Borsh { args: Vec<AbiBorshParameter> },
+}
+
+impl Default for AbiParameters {
+    fn default() -> Self {
+        // JSON was picked arbitrarily for the default value, but generally it does not matter
+        // whether this is JSON or Borsh.
+        AbiParameters::Json { args: Vec::new() }
+    }
+}
+
+impl AbiParameters {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::Json { args } => args.is_empty(),
+            Self::Borsh { args } => args.is_empty(),
+        }
+    }
+}
+
+/// Information about a single named JSON function parameter.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AbiJsonParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
     pub name: String,
-    /// Parameter type along with its serialization type (e.g. `u32` and `borsh` in `fn foo(#[serializer(borsh)] p1: u32) {}`).
-    #[serde(flatten)]
-    pub typ: AbiType,
+    /// JSON Subschema that represents this type (can be an inline primitive, a reference to the root schema and a few other corner-case things).
+    pub type_schema: Schema,
+}
+
+/// Information about a single named Borsh function parameter.
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct AbiBorshParameter {
+    /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
+    pub name: String,
+    /// Inline Borsh schema that represents this type.
+    #[serde(with = "BorshSchemaContainerDef")]
+    pub type_schema: BorshSchemaContainer,
+}
+
+// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
+impl Clone for AbiBorshParameter {
+    fn clone(&self) -> Self {
+        let type_schema = BorshSchemaContainer {
+            declaration: self.type_schema.declaration.clone(),
+            definitions: self
+                .type_schema
+                .definitions
+                .iter()
+                .map(|(k, v)| (k.clone(), borsh_clone::clone_definition(v)))
+                .collect(),
+        };
+        Self {
+            name: self.name.clone(),
+            type_schema,
+        }
+    }
 }
 
 /// Information about a single type (e.g. return type).
@@ -157,7 +214,7 @@ pub enum AbiType {
     },
 }
 
-// TODO: Maybe implement `Clone` for `BorshSchemaContainer` in borsh upstream?
+// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
 impl Clone for AbiType {
     fn clone(&self) -> Self {
         match self {
@@ -666,17 +723,14 @@ mod tests {
     fn test_deser_param() {
         #[derive(BorshSchema)]
         struct Unit;
-        let expected_param = AbiParameter {
+        let expected_param = AbiBorshParameter {
             name: "foo".to_string(),
-            typ: AbiType::Borsh {
-                type_schema: <Unit>::schema_container(),
-            },
+            type_schema: <Unit>::schema_container(),
         };
         let value = serde_json::to_value(&expected_param).unwrap();
         let expected_json = r#"
           {
             "name": "foo",
-            "serialization_type": "borsh",
             "type_schema": {
               "declaration": "Unit",
               "definitions": {
@@ -690,20 +744,16 @@ mod tests {
         let expected_value: Value = serde_json::from_str(expected_json).unwrap();
         assert_eq!(value, expected_value);
 
-        let param = serde_json::from_str::<AbiParameter>(expected_json).unwrap();
+        let param = serde_json::from_str::<AbiBorshParameter>(expected_json).unwrap();
         assert_eq!(param.name, "foo");
-        if let AbiType::Borsh { type_schema } = param.typ {
-            assert_eq!(type_schema.declaration, "Unit".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
-            assert_eq!(
-                type_schema.definitions.get("Unit").unwrap(),
-                &Definition::Struct {
-                    fields: Fields::Empty
-                }
-            );
-        } else {
-            panic!("Unexpected serialization type")
-        }
+        assert_eq!(param.type_schema.declaration, "Unit".to_string());
+        assert_eq!(param.type_schema.definitions.len(), 1);
+        assert_eq!(
+            param.type_schema.definitions.get("Unit").unwrap(),
+            &Definition::Struct {
+                fields: Fields::Empty
+            }
+        );
     }
 
     #[test]
@@ -711,7 +761,6 @@ mod tests {
         let json = r#"
           {
             "name": "foo",
-            "serialization_type": "borsh",
             "extra": "blah-blah",
             "type_schema": {
               "declaration": "Unit",
@@ -723,7 +772,7 @@ mod tests {
             }
           }
         "#;
-        serde_json::from_str::<AbiParameter>(json)
+        serde_json::from_str::<AbiBorshParameter>(json)
             .expect_err("Expected deserialization to fail due to unknown field");
     }
 
