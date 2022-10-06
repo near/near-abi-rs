@@ -1,5 +1,6 @@
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
+use schemars::JsonSchema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -22,7 +23,7 @@ const SCHEMA_SEMVER: Version = Version {
 pub const SCHEMA_VERSION: &str = "0.2.0";
 
 /// Contract ABI.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
@@ -54,7 +55,7 @@ fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::
     Ok(unchecked)
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default, JsonSchema)]
 pub struct BuildInfo {
     /// The compiler (versioned) that was used to build the contract.
     pub compiler: String,
@@ -65,7 +66,7 @@ pub struct BuildInfo {
     pub image: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default, JsonSchema)]
 pub struct AbiMetadata {
     /// The name of the smart contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -87,7 +88,7 @@ pub struct AbiMetadata {
 }
 
 /// Core ABI information.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AbiBody {
     /// ABIs of all contract's functions.
@@ -97,7 +98,7 @@ pub struct AbiBody {
 }
 
 /// ABI of a single function.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AbiFunction {
     pub name: String,
@@ -131,7 +132,7 @@ pub struct AbiFunction {
 }
 
 /// A list of function parameters sharing the same serialization type.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
 #[serde(deny_unknown_fields)]
@@ -158,7 +159,7 @@ impl AbiParameters {
 }
 
 /// Information about a single named JSON function parameter.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AbiJsonParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
@@ -176,6 +177,28 @@ pub struct AbiBorshParameter {
     /// Inline Borsh schema that represents this type.
     #[serde(with = "BorshSchemaContainerDef")]
     pub type_schema: BorshSchemaContainer,
+}
+
+impl JsonSchema for AbiBorshParameter {
+    fn schema_name() -> String {
+        "AbiBorshParameter".to_string()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        let mut schema_object = schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::Object.into()),
+            ..Default::default()
+        };
+        let object_validation = schema_object.object();
+        object_validation
+            .properties
+            .insert("name".to_string(), <String as JsonSchema>::json_schema(gen));
+        object_validation
+            .properties
+            // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
+            .insert("type_schema".to_string(), Schema::Bool(true));
+        schemars::schema::Schema::Object(schema_object)
+    }
 }
 
 // FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
@@ -212,6 +235,25 @@ pub enum AbiType {
         #[serde(with = "BorshSchemaContainerDef")]
         type_schema: BorshSchemaContainer,
     },
+}
+
+impl JsonSchema for AbiType {
+    fn schema_name() -> String {
+        "AbiType".to_string()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+            subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
+                one_of: Some(vec![
+                    <Schema as schemars::JsonSchema>::json_schema(gen),
+                    Schema::Bool(true), // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
+                ]),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
+    }
 }
 
 // FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released

@@ -15,7 +15,7 @@ jobs:
 
       - name: Get MSRV
         run: |
-          RUST_MSRV="$(sed -n 's/rust-version *= *"\(.*\)"/\1/p' Cargo.toml)"
+          RUST_MSRV="$(sed -n 's/rust-version *= *"\(.*\)"/\1/p' near-abi/Cargo.toml)"
           echo "RUST_MSRV=$RUST_MSRV" >> $GITHUB_ENV
 
       - name: "Install ${{ env.RUST_MSRV }} toolchain (MSRV)"
@@ -48,3 +48,16 @@ jobs:
 
       - name: Check Clippy
         run: cargo clippy --tests -- -Dclippy::all
+
+  check-metaschema:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Generate Current ABI Meta-schema
+        run: cargo run --package metaschema-gen > tmp.json
+
+      - name: Check that Current Meta-schema is Up-to-date
+        run: diff tmp.json metaschema/near-abi-current-schema.json
