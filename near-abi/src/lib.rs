@@ -58,7 +58,7 @@ fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default, JsonSchema)]
 pub struct BuildInfo {
     /// The compiler (versioned) that was used to build the contract.
-    pub compiler: String,
+    pub compilerv2: String,
     /// The build tool (versioned) that was used to build the contract.
     pub builder: String,
     /// The docker image (versioned) where the contract was built.

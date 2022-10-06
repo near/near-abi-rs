@@ -282,14 +282,14 @@
       "type": "object",
       "required": [
         "builder",
-        "compiler"
+        "compilerv2"
       ],
       "properties": {
         "builder": {
           "description": "The build tool (versioned) that was used to build the contract.",
           "type": "string"
         },
-        "compiler": {
+        "compilerv2": {
           "description": "The compiler (versioned) that was used to build the contract.",
           "type": "string"
         },
