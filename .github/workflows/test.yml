@@ -67,5 +67,5 @@ jobs:
       - name: Check that Current Meta-schema is Up-to-date
         run: diff tmp.json metaschema/near-abi-current-schema.json
 
-      - name: Check that Meta-schema is Backward Compatible\
+      - name: Check that Meta-schema is Backward Compatible
         run: pip install semver && python .github/check_metaschema_compatibility.py
