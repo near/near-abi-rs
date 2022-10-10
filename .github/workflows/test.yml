@@ -56,8 +56,16 @@ jobs:
       - name: Checkout Sources
         uses: actions/checkout@v2
 
+      - name: Install json-schema-compatibility-checker
+        run: |
+          wget https://github.com/itegulov/json-schema-compatibility-checker/releases/download/v0.1.0/jsonschemacompat_0.1.0_all.deb
+          sudo apt install ./jsonschemacompat_0.1.0_all.deb
+
       - name: Generate Current ABI Meta-schema
         run: cargo run --package metaschema-gen > tmp.json
 
       - name: Check that Current Meta-schema is Up-to-date
         run: diff tmp.json metaschema/near-abi-current-schema.json
+
+      - name: Check that Meta-schema is Backward Compatible
+        run: pip install semver && python .github/check_metaschema_compatibility.py
