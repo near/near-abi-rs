@@ -16,12 +16,16 @@ persisted_semvers.sort()
 last_persisted_semver = persisted_semvers[-1]
 print("Last persisted ABI schema version:", last_persisted_semver)
 
+current_semver = None
 with open("near-abi/src/lib.rs", "r") as sources:
     for line in sources.readlines():
         match = re.match(rust_schema_version_pattern, line)
         if match is not None:
             current_semver = semver.VersionInfo.parse(match.group(1))
             break
+if current_semver is None:
+    print("Could not parse the current ABI schema version. Have you changed the way SCHEMA_VERSION is exposed?")
+    exit(1)
 print("Current ABI schema version:", current_semver)
 
 if (current_semver.major > last_persisted_semver.major or
