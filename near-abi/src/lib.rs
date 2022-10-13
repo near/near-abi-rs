@@ -245,7 +245,7 @@ impl JsonSchema for AbiType {
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
         schemars::schema::Schema::Object(schemars::schema::SchemaObject {
             subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
-                one_of: Some(vec![
+                any_of: Some(vec![
                     <Schema as schemars::JsonSchema>::json_schema(gen),
                     Schema::Bool(true), // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
                 ]),
