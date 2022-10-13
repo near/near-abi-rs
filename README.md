@@ -14,7 +14,7 @@
   </p>
 
   <h3>
-      <a href="https://github.com/near/abi">ABI</a>
+      <a href="https://github.com/near/abi">NEAR ABI</a>
       <span> | </span>
       <a href="https://docs.rs/near-abi">Reference Documentation</a>
       <span> | </span>
@@ -30,7 +30,7 @@
 
 ❗ **Warning: ABI is still in early stages of development so expect breaking changes to this library until we reach 1.0**
 
-This library is meant to serve as an unopinionated source of Rust models for [ABI](https://github.com/near/abi).
+This library is meant to serve as an unopinionated reference for Rust models of the [NEAR ABI](https://github.com/near/abi).
 
 ## ABI Metaschema
 
