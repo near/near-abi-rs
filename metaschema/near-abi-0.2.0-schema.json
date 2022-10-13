@@ -257,7 +257,7 @@
       ]
     },
     "AbiType": {
-      "oneOf": [
+      "anyOf": [
         {
           "description": "A JSON Schema.",
           "anyOf": [
