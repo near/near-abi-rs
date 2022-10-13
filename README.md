@@ -41,3 +41,14 @@ Metaschemas describe the properties of ABI schema format and allow anyone to val
 ## Contributing
 
 If you are interested in contributing, please look at the [contributing guidelines](CONTRIBUTING.md).
+
+## License
+
+Licensed under either of
+
+* Apache License, Version 2.0
+   ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license
+   ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+
+at your option.
