@@ -81,6 +81,7 @@ pub struct AbiMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<BuildInfo>,
     /// The SHA-256 hash of the contract WASM code in Base58 format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wasm_hash: Option<String>,
     /// Other arbitrary metadata.
     #[serde(default, flatten, skip_serializing_if = "HashMap::is_empty")]
