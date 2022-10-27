@@ -1,17 +1,8 @@
 use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
 use schemars::schema::{RootSchema, Schema};
-use schemars::JsonSchema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
-
-#[doc(hidden)]
-#[cfg(feature = "__chunked-entries")]
-#[path = "private.rs"]
-pub mod __private;
-
-#[cfg(feature = "legacy-support")]
-pub mod legacy;
 
 // Keep in sync with SCHEMA_VERSION below.
 const SCHEMA_SEMVER: Version = Version {
@@ -26,7 +17,7 @@ const SCHEMA_SEMVER: Version = Version {
 pub const SCHEMA_VERSION: &str = "0.2.0";
 
 /// Contract ABI.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiRoot {
     /// Semver of the ABI schema format.
@@ -58,7 +49,7 @@ fn ensure_current_version<'de, D: Deserializer<'de>>(d: D) -> Result<String, D::
     Ok(unchecked)
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct BuildInfo {
     /// The compiler (versioned) that was used to build the contract.
     pub compiler: String,
@@ -69,7 +60,7 @@ pub struct BuildInfo {
     pub image: Option<String>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, Default)]
 pub struct AbiMetadata {
     /// The name of the smart contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,7 +75,6 @@ pub struct AbiMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build: Option<BuildInfo>,
     /// The SHA-256 hash of the contract WASM code in Base58 format.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wasm_hash: Option<String>,
     /// Other arbitrary metadata.
     #[serde(default, flatten, skip_serializing_if = "HashMap::is_empty")]
@@ -92,7 +82,7 @@ pub struct AbiMetadata {
 }
 
 /// Core ABI information.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiBody {
     /// ABIs of all contract's functions.
@@ -102,7 +92,7 @@ pub struct AbiBody {
 }
 
 /// ABI of a single function.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiFunction {
     pub name: String,
@@ -136,7 +126,7 @@ pub struct AbiFunction {
 }
 
 /// A list of function parameters sharing the same serialization type.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
 #[serde(deny_unknown_fields)]
@@ -163,7 +153,7 @@ impl AbiParameters {
 }
 
 /// Information about a single named JSON function parameter.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiJsonParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
@@ -181,42 +171,6 @@ pub struct AbiBorshParameter {
     /// Inline Borsh schema that represents this type.
     #[serde(with = "BorshSchemaContainerDef")]
     pub type_schema: BorshSchemaContainer,
-}
-
-impl JsonSchema for AbiBorshParameter {
-    fn schema_name() -> String {
-        "AbiBorshParameter".to_string()
-    }
-
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        let mut name_schema_object = <String as JsonSchema>::json_schema(gen).into_object();
-        name_schema_object.metadata().description =
-            Some("Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).".to_string());
-
-        let mut type_schema_object = Schema::Bool(true).into_object();
-        type_schema_object.metadata().description =
-            Some("Inline Borsh schema that represents this type.".to_string());
-
-        let mut schema_object = schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::Object.into()),
-            ..Default::default()
-        };
-        schema_object.metadata().description =
-            Some("Information about a single named Borsh function parameter.".to_string());
-        let object_validation = schema_object.object();
-        object_validation
-            .properties
-            .insert("name".to_string(), name_schema_object.into());
-        object_validation
-            .properties
-            // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
-            .insert("type_schema".to_string(), type_schema_object.into());
-        object_validation.required.insert("name".to_string());
-        object_validation.required.insert("type_schema".to_string());
-        object_validation.additional_properties =
-            Some(schemars::schema::Schema::Bool(false).into());
-        schema_object.into()
-    }
 }
 
 // FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
@@ -253,70 +207,6 @@ pub enum AbiType {
         #[serde(with = "BorshSchemaContainerDef")]
         type_schema: BorshSchemaContainer,
     },
-}
-
-impl JsonSchema for AbiType {
-    fn schema_name() -> String {
-        "AbiType".to_string()
-    }
-
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        let mut json_abi_type = schemars::schema::SchemaObject::default();
-        let json_abi_schema = json_abi_type.object();
-        json_abi_schema
-            .properties
-            .insert("serialization_type".to_string(), {
-                let schema = <String as JsonSchema>::json_schema(gen);
-                let mut schema = schema.into_object();
-                schema.enum_values = Some(vec!["json".into()]);
-                schema.into()
-            });
-        json_abi_schema
-            .properties
-            .insert("type_schema".to_string(), gen.subschema_for::<Schema>());
-        json_abi_schema
-            .required
-            .insert("serialization_type".to_string());
-        json_abi_schema.required.insert("type_schema".to_string());
-        json_abi_schema.additional_properties = Some(schemars::schema::Schema::Bool(false).into());
-
-        let mut borsh_abi_type = schemars::schema::SchemaObject::default();
-        let borsh_abi_schema = borsh_abi_type.object();
-        borsh_abi_schema
-            .properties
-            .insert("serialization_type".to_string(), {
-                let schema = <String as JsonSchema>::json_schema(gen);
-                let mut schema = schema.into_object();
-                schema.enum_values = Some(vec!["borsh".into()]);
-                schema.into()
-            });
-        borsh_abi_schema
-            .properties
-            // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
-            .insert(
-                "type_schema".to_string(),
-                schemars::schema::SchemaObject::default().into(),
-            );
-        borsh_abi_schema
-            .required
-            .insert("serialization_type".to_string());
-        borsh_abi_schema.required.insert("type_schema".to_string());
-        borsh_abi_schema.additional_properties = Some(schemars::schema::Schema::Bool(false).into());
-
-        let mut schema_object = schemars::schema::SchemaObject {
-            subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
-                one_of: Some(vec![
-                    json_abi_type.into(),
-                    borsh_abi_type.into(), // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
-                ]),
-                ..Default::default()
-            })),
-            ..Default::default()
-        };
-        schema_object.metadata().description =
-            Some("Information about a single type (e.g. return type).".to_string());
-        schema_object.into()
-    }
 }
 
 // FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
