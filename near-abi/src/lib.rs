@@ -186,19 +186,33 @@ impl JsonSchema for AbiBorshParameter {
     }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        let mut name_schema_object = <String as JsonSchema>::json_schema(gen).into_object();
+        name_schema_object.metadata().description =
+            Some("Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).".to_string());
+
+        let mut type_schema_object = Schema::Bool(true).into_object();
+        type_schema_object.metadata().description =
+            Some("Inline Borsh schema that represents this type.".to_string());
+
         let mut schema_object = schemars::schema::SchemaObject {
             instance_type: Some(schemars::schema::InstanceType::Object.into()),
             ..Default::default()
         };
+        schema_object.metadata().description =
+            Some("Information about a single named Borsh function parameter.".to_string());
         let object_validation = schema_object.object();
         object_validation
             .properties
-            .insert("name".to_string(), <String as JsonSchema>::json_schema(gen));
+            .insert("name".to_string(), name_schema_object.into());
         object_validation
             .properties
             // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
-            .insert("type_schema".to_string(), Schema::Bool(true));
-        schemars::schema::Schema::Object(schema_object)
+            .insert("type_schema".to_string(), type_schema_object.into());
+        object_validation.required.insert("name".to_string());
+        object_validation.required.insert("type_schema".to_string());
+        object_validation.additional_properties =
+            Some(schemars::schema::Schema::Bool(false).into());
+        schema_object.into()
     }
 }
 
@@ -244,16 +258,61 @@ impl JsonSchema for AbiType {
     }
 
     fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+        let mut json_abi_type = schemars::schema::SchemaObject::default();
+        let json_abi_schema = json_abi_type.object();
+        json_abi_schema
+            .properties
+            .insert("serialization_type".to_string(), {
+                let schema = <String as JsonSchema>::json_schema(gen);
+                let mut schema = schema.into_object();
+                schema.enum_values = Some(vec!["json".into()]);
+                schema.into()
+            });
+        json_abi_schema
+            .properties
+            .insert("type_schema".to_string(), gen.subschema_for::<Schema>());
+        json_abi_schema
+            .required
+            .insert("serialization_type".to_string());
+        json_abi_schema.required.insert("type_schema".to_string());
+        json_abi_schema.additional_properties = Some(schemars::schema::Schema::Bool(false).into());
+
+        let mut borsh_abi_type = schemars::schema::SchemaObject::default();
+        let borsh_abi_schema = borsh_abi_type.object();
+        borsh_abi_schema
+            .properties
+            .insert("serialization_type".to_string(), {
+                let schema = <String as JsonSchema>::json_schema(gen);
+                let mut schema = schema.into_object();
+                schema.enum_values = Some(vec!["borsh".into()]);
+                schema.into()
+            });
+        borsh_abi_schema
+            .properties
+            // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
+            .insert(
+                "type_schema".to_string(),
+                schemars::schema::SchemaObject::default().into(),
+            );
+        borsh_abi_schema
+            .required
+            .insert("serialization_type".to_string());
+        borsh_abi_schema.required.insert("type_schema".to_string());
+        borsh_abi_schema.additional_properties = Some(schemars::schema::Schema::Bool(false).into());
+
+        let mut schema_object = schemars::schema::SchemaObject {
             subschemas: Some(Box::new(schemars::schema::SubschemaValidation {
-                any_of: Some(vec![
-                    <Schema as schemars::JsonSchema>::json_schema(gen),
-                    Schema::Bool(true), // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
+                one_of: Some(vec![
+                    json_abi_type.into(),
+                    borsh_abi_type.into(), // TODO: Narrow to BorshSchemaContainer once it derives JsonSchema
                 ]),
                 ..Default::default()
             })),
             ..Default::default()
-        })
+        };
+        schema_object.metadata().description =
+            Some("Information about a single type (e.g. return type).".to_string());
+        schema_object.into()
     }
 }
 
