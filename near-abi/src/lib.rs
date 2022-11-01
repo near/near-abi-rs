@@ -127,7 +127,7 @@ pub struct AbiFunction {
 
 /// Function kind regulates whether this function's invocation requires a transaction (so-called
 /// call functions) or not (view functions).
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AbiFunctionKind {
     View,
@@ -135,7 +135,7 @@ pub enum AbiFunctionKind {
 }
 
 /// Function can have multiple modifiers that can change its semantics.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AbiFunctionModifier {
     /// Init functions can be used to initialize the state of the contract.
