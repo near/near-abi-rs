@@ -13,14 +13,14 @@ pub mod __private;
 // Keep in sync with SCHEMA_VERSION below.
 const SCHEMA_SEMVER: Version = Version {
     major: 0,
-    minor: 2,
+    minor: 3,
     patch: 0,
     pre: semver::Prerelease::EMPTY,
     build: semver::BuildMetadata::EMPTY,
 };
 
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION: &str = "0.2.0";
+pub const SCHEMA_VERSION: &str = "0.3.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
@@ -106,18 +106,11 @@ pub struct AbiFunction {
     /// Human-readable documentation parsed from the source file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doc: Option<String>,
-    /// Whether function does not modify the state.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub is_view: bool,
-    /// Whether function can be used to initialize the state.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub is_init: bool,
-    /// Whether function is accepting $NEAR.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub is_payable: bool,
-    /// Whether function can only accept calls from self (current account).
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub is_private: bool,
+    /// Function kind that regulates whether the function has to be invoked from a transaction.
+    pub kind: AbiFunctionKind,
+    /// List of modifiers affecting the function.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modifiers: Vec<AbiFunctionModifier>,
     /// Type identifiers of the function parameters.
     #[serde(default, skip_serializing_if = "AbiParameters::is_empty")]
     pub params: AbiParameters,
@@ -130,6 +123,31 @@ pub struct AbiFunction {
     /// Return type identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<AbiType>,
+}
+
+/// Function kind regulates whether this function's invocation requires a transaction (so-called
+/// call functions) or not (view functions).
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AbiFunctionKind {
+    View,
+    Call,
+}
+
+/// Function can have multiple modifiers that can change its semantics.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AbiFunctionModifier {
+    /// Init functions can be used to initialize the state of the contract.
+    Init,
+    /// Private functions can only be called from the contract containing them. Usually, when a
+    /// contract has to have a callback for a remote cross-contract call, this callback method
+    /// should only be called by the contract itself.
+    Private,
+    /// Payable functions can accept token transfer together with the function call.
+    /// This is done so that contracts can define a fee in tokens that needs to be payed when
+    /// they are used.
+    Payable,
 }
 
 /// A list of function parameters sharing the same serialization type.
@@ -498,10 +516,6 @@ mod borsh_serde {
             .map(|(k, HelperDefinition(v))| (k, v))
             .collect())
     }
-}
-
-fn is_false(b: &bool) -> bool {
-    !b
 }
 
 #[cfg(test)]

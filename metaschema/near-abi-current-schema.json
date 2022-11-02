@@ -80,6 +80,7 @@
       "description": "ABI of a single function.",
       "type": "object",
       "required": [
+        "kind",
         "name"
       ],
       "properties": {
@@ -108,21 +109,20 @@
             "null"
           ]
         },
-        "is_init": {
-          "description": "Whether function can be used to initialize the state.",
-          "type": "boolean"
+        "kind": {
+          "description": "Function kind that regulates whether the function has to be invoked from a transaction.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/AbiFunctionKind"
+            }
+          ]
         },
-        "is_payable": {
-          "description": "Whether function is accepting $NEAR.",
-          "type": "boolean"
-        },
-        "is_private": {
-          "description": "Whether function can only accept calls from self (current account).",
-          "type": "boolean"
-        },
-        "is_view": {
-          "description": "Whether function does not modify the state.",
-          "type": "boolean"
+        "modifiers": {
+          "description": "List of modifiers affecting the function.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AbiFunctionModifier"
+          }
         },
         "name": {
           "type": "string"
@@ -148,6 +148,40 @@
         }
       },
       "additionalProperties": false
+    },
+    "AbiFunctionKind": {
+      "description": "Function kind regulates whether this function's invocation requires a transaction (so-called call functions) or not (view functions).",
+      "type": "string",
+      "enum": [
+        "view",
+        "call"
+      ]
+    },
+    "AbiFunctionModifier": {
+      "description": "Function can have multiple modifiers that can change its semantics.",
+      "oneOf": [
+        {
+          "description": "Init functions can be used to initialize the state of the contract.",
+          "type": "string",
+          "enum": [
+            "init"
+          ]
+        },
+        {
+          "description": "Private functions can only be called from the contract containing them. Usually, when a contract has to have a callback for a remote cross-contract call, this callback method should only be called by the contract itself.",
+          "type": "string",
+          "enum": [
+            "private"
+          ]
+        },
+        {
+          "description": "Payable functions can accept token transfer together with the function call. This is done so that contracts can define a fee in tokens that needs to be payed when they are used.",
+          "type": "string",
+          "enum": [
+            "payable"
+          ]
+        }
+      ]
     },
     "AbiJsonParameter": {
       "description": "Information about a single named JSON function parameter.",
