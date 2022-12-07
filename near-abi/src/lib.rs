@@ -94,6 +94,9 @@ pub struct AbiMetadata {
 pub struct AbiBody {
     /// ABIs of all contract's functions.
     pub functions: Vec<AbiFunction>,
+    /// ABIs of all contract's events.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<AbiEvent>,
     /// Root JSON Schema containing all types referenced in the functions.
     pub root_schema: RootSchema,
 }
@@ -354,6 +357,18 @@ impl Clone for AbiType {
             }
         }
     }
+}
+
+/// ABI of a single event.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+pub struct AbiEvent {
+    /// Event's name
+    pub name: String,
+    /// Human-readable documentation parsed from the source file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc: Option<String>,
+    /// JSON Schema describing this event's payload
+    pub data: Schema,
 }
 
 #[derive(Serialize, Deserialize)]

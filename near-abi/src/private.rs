@@ -1,3 +1,5 @@
+use crate::AbiEvent;
+
 use super::{
     ensure_current_version, AbiBody, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION,
 };
@@ -15,11 +17,16 @@ pub struct ChunkedAbiEntry {
 }
 
 impl ChunkedAbiEntry {
-    pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> ChunkedAbiEntry {
+    pub fn new(
+        functions: Vec<AbiFunction>,
+        events: Vec<AbiEvent>,
+        root_schema: RootSchema,
+    ) -> ChunkedAbiEntry {
         Self {
             schema_version: SCHEMA_VERSION.to_string(),
             body: AbiBody {
                 functions,
+                events,
                 root_schema,
             },
         }
@@ -30,6 +37,7 @@ impl ChunkedAbiEntry {
     ) -> Result<ChunkedAbiEntry, AbiCombineError> {
         let mut schema_version = None;
         let mut functions = Vec::<AbiFunction>::new();
+        let mut events = Vec::<AbiEvent>::new();
 
         let mut gen = schemars::gen::SchemaGenerator::default();
         let definitions = gen.definitions_mut();
@@ -52,6 +60,9 @@ impl ChunkedAbiEntry {
 
             // Update resulting function list
             functions.extend(entry.body.functions);
+
+            // Update resulting event list
+            events.extend(entry.body.events);
         }
 
         if !unexpected_versions.is_empty() {
@@ -70,6 +81,7 @@ impl ChunkedAbiEntry {
             schema_version: schema_version.unwrap(),
             body: AbiBody {
                 functions,
+                events,
                 root_schema: gen.into_root_schema_for::<String>(),
             },
         })
