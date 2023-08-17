@@ -9,7 +9,7 @@ repository = "https://github.com/near/near-abi-rs"
 description = "NEAR smart contract ABI primitives"
 
 [dependencies]
-borsh = { version = "0.9", features = ["const-generics"] }
+borsh = { version = "1.0.0-alpha.3", features = ["schema", "derive"] }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 schemars = { version = "0.8.11", features = ["impl_json_schema"] }

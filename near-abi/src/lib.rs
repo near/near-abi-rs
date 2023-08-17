@@ -3,7 +3,7 @@ use schemars::schema::{RootSchema, Schema};
 use schemars::JsonSchema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[doc(hidden)]
 #[cfg(feature = "__chunked-entries")]
@@ -188,7 +188,7 @@ pub struct AbiJsonParameter {
 }
 
 /// Information about a single named Borsh function parameter.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiBorshParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
@@ -234,27 +234,8 @@ impl JsonSchema for AbiBorshParameter {
     }
 }
 
-// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
-impl Clone for AbiBorshParameter {
-    fn clone(&self) -> Self {
-        let type_schema = BorshSchemaContainer {
-            declaration: self.type_schema.declaration.clone(),
-            definitions: self
-                .type_schema
-                .definitions
-                .iter()
-                .map(|(k, v)| (k.clone(), borsh_clone::clone_definition(v)))
-                .collect(),
-        };
-        Self {
-            name: self.name.clone(),
-            type_schema,
-        }
-    }
-}
-
 /// Information about a single type (e.g. return type).
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
 #[serde(deny_unknown_fields)]
@@ -334,79 +315,266 @@ impl JsonSchema for AbiType {
     }
 }
 
-// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
-impl Clone for AbiType {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Json { type_schema } => Self::Json {
-                type_schema: type_schema.clone(),
-            },
-            Self::Borsh { type_schema } => {
-                let type_schema = BorshSchemaContainer {
-                    declaration: type_schema.declaration.clone(),
-                    definitions: type_schema
-                        .definitions
-                        .iter()
-                        .map(|(k, v)| (k.clone(), borsh_clone::clone_definition(v)))
-                        .collect(),
-                };
-                Self::Borsh { type_schema }
-            }
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "BorshSchemaContainer")]
 struct BorshSchemaContainerDef {
+    #[serde(getter = "borsh_serde::getters::declaration")]
     declaration: Declaration,
-    #[serde(with = "borsh_serde")]
-    definitions: HashMap<Declaration, Definition>,
+    #[serde(with = "borsh_serde", getter = "borsh_serde::getters::definitions")]
+    definitions: BTreeMap<Declaration, Definition>,
 }
 
-/// Cloning functions for borsh types.
-mod borsh_clone {
-    use borsh::schema::{Definition, Fields};
-
-    pub fn clone_fields(fields: &Fields) -> Fields {
-        match fields {
-            Fields::Empty => Fields::Empty,
-            Fields::NamedFields(f) => Fields::NamedFields(f.clone()),
-            Fields::UnnamedFields(f) => Fields::UnnamedFields(f.clone()),
-        }
-    }
-
-    pub fn clone_definition(definition: &Definition) -> Definition {
-        match definition {
-            Definition::Array { length, elements } => Definition::Array {
-                length: *length,
-                elements: elements.clone(),
-            },
-            Definition::Sequence { elements } => Definition::Sequence {
-                elements: elements.clone(),
-            },
-            Definition::Tuple { elements } => Definition::Tuple {
-                elements: elements.clone(),
-            },
-            Definition::Enum { variants } => Definition::Enum {
-                variants: variants.clone(),
-            },
-            Definition::Struct { fields } => Definition::Struct {
-                fields: clone_fields(fields),
-            },
-        }
+impl From<BorshSchemaContainerDef> for BorshSchemaContainer {
+    fn from(value: BorshSchemaContainerDef) -> Self {
+        Self::new(value.declaration, value.definitions)
     }
 }
 
 /// This submodules follows <https://serde.rs/remote-derive.html> to derive Serialize/Deserialize for
-/// `BorshSchemaContainer` parameters. The top-level serialization type is `HashMap<Declaration, Definition>`
+/// `BorshSchemaContainer` parameters. The top-level serialization type is `BTreeMap<Declaration, Definition>`
 /// for the sake of being easily plugged into `BorshSchemaContainerDef` (see its parameters).
 mod borsh_serde {
     use super::*;
     use serde::ser::SerializeMap;
     use serde::{Deserializer, Serializer};
+    pub mod getters {
+        use super::*;
 
-    #[derive(Serialize, Deserialize)]
+        pub fn declaration(obj: &BorshSchemaContainer) -> &Declaration {
+            obj.declaration()
+        }
+
+        pub fn definitions(obj: &BorshSchemaContainer) -> BTreeMap<Declaration, Definition> {
+            let definitions: BTreeMap<Declaration, Definition> = obj
+                .definitions()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            definitions
+        }
+    }
+
+    // impl DefinitionDef { fn serialize<__S>( __self: &Definition, __serializer: __S, ) -> _serde::__private::Result<__S::Ok, __S::Error>
+    // is expansion of
+    // #[derive(Seserialize)]
+    // #[serde(remote = "Definition")]
+    // enum DefinitionDef {
+    // plus non_exhaustive match
+    #[doc(hidden)]
+    #[allow(
+        non_upper_case_globals,
+        unused_attributes,
+        unused_qualifications,
+        clippy::all
+    )]
+    const _: () = {
+        #[allow(unused_extern_crates, clippy::useless_attribute)]
+        extern crate serde as _serde;
+        impl DefinitionDef {
+            fn serialize<__S>(
+                __self: &Definition,
+                __serializer: __S,
+            ) -> _serde::__private::Result<__S::Ok, __S::Error>
+            where
+                __S: _serde::Serializer,
+            {
+                match _serde::__private::None::<&DefinitionDef> {
+                    _serde::__private::Some(DefinitionDef::Array {
+                        length: __v0,
+                        elements: __v1,
+                    }) => {}
+                    _serde::__private::Some(DefinitionDef::Sequence { elements: __v0 }) => {}
+                    _serde::__private::Some(DefinitionDef::Tuple { elements: __v0 }) => {}
+                    _serde::__private::Some(DefinitionDef::Enum { variants: __v0 }) => {}
+                    _serde::__private::Some(DefinitionDef::Struct { fields: __v0 }) => {}
+                    _ => {}
+                }
+                match _serde::__private::None {
+                    _serde::__private::Some((__v0, __v1)) => {
+                        let _ = DefinitionDef::Array {
+                            length: __v0,
+                            elements: __v1,
+                        };
+                    }
+                    _ => {}
+                }
+                match _serde::__private::None {
+                    _serde::__private::Some((__v0,)) => {
+                        let _ = DefinitionDef::Sequence { elements: __v0 };
+                    }
+                    _ => {}
+                }
+                match _serde::__private::None {
+                    _serde::__private::Some((__v0,)) => {
+                        let _ = DefinitionDef::Tuple { elements: __v0 };
+                    }
+                    _ => {}
+                }
+                match _serde::__private::None {
+                    _serde::__private::Some((__v0,)) => {
+                        let _ = DefinitionDef::Enum { variants: __v0 };
+                    }
+                    _ => {}
+                }
+                match _serde::__private::None {
+                    _serde::__private::Some((__v0,)) => {
+                        let _ = DefinitionDef::Struct { fields: __v0 };
+                    }
+                    _ => {}
+                }
+                match *__self {
+                    Definition::Array {
+                        ref length,
+                        ref elements,
+                    } => {
+                        let mut __serde_state = _serde::Serializer::serialize_struct_variant(
+                            __serializer,
+                            "DefinitionDef",
+                            0u32,
+                            "Array",
+                            0 + 1 + 1,
+                        )?;
+                        _serde::ser::SerializeStructVariant::serialize_field(
+                            &mut __serde_state,
+                            "length",
+                            length,
+                        )?;
+                        _serde::ser::SerializeStructVariant::serialize_field(
+                            &mut __serde_state,
+                            "elements",
+                            elements,
+                        )?;
+                        _serde::ser::SerializeStructVariant::end(__serde_state)
+                    }
+                    Definition::Sequence { ref elements } => {
+                        _serde::Serializer::serialize_newtype_variant(
+                            __serializer,
+                            "DefinitionDef",
+                            1u32,
+                            "Sequence",
+                            {
+                                #[doc(hidden)]
+                                struct __SerializeWith<'__a> {
+                                    values: (&'__a Declaration,),
+                                    phantom: _serde::__private::PhantomData<Definition>,
+                                }
+                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
+                                    fn serialize<__S>(
+                                        &self,
+                                        __s: __S,
+                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
+                                    where
+                                        __S: _serde::Serializer,
+                                    {
+                                        transparent::serialize(self.values.0, __s)
+                                    }
+                                }
+                                &__SerializeWith {
+                                    values: (elements,),
+                                    phantom: _serde::__private::PhantomData::<Definition>,
+                                }
+                            },
+                        )
+                    }
+                    Definition::Tuple { ref elements } => {
+                        _serde::Serializer::serialize_newtype_variant(
+                            __serializer,
+                            "DefinitionDef",
+                            2u32,
+                            "Tuple",
+                            {
+                                #[doc(hidden)]
+                                struct __SerializeWith<'__a> {
+                                    values: (&'__a Vec<Declaration>,),
+                                    phantom: _serde::__private::PhantomData<Definition>,
+                                }
+                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
+                                    fn serialize<__S>(
+                                        &self,
+                                        __s: __S,
+                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
+                                    where
+                                        __S: _serde::Serializer,
+                                    {
+                                        transparent::serialize(self.values.0, __s)
+                                    }
+                                }
+                                &__SerializeWith {
+                                    values: (elements,),
+                                    phantom: _serde::__private::PhantomData::<Definition>,
+                                }
+                            },
+                        )
+                    }
+                    Definition::Enum { ref variants } => {
+                        _serde::Serializer::serialize_newtype_variant(
+                            __serializer,
+                            "DefinitionDef",
+                            3u32,
+                            "Enum",
+                            {
+                                #[doc(hidden)]
+                                struct __SerializeWith<'__a> {
+                                    values: (&'__a Vec<(VariantName, Declaration)>,),
+                                    phantom: _serde::__private::PhantomData<Definition>,
+                                }
+                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
+                                    fn serialize<__S>(
+                                        &self,
+                                        __s: __S,
+                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
+                                    where
+                                        __S: _serde::Serializer,
+                                    {
+                                        transparent::serialize(self.values.0, __s)
+                                    }
+                                }
+                                &__SerializeWith {
+                                    values: (variants,),
+                                    phantom: _serde::__private::PhantomData::<Definition>,
+                                }
+                            },
+                        )
+                    }
+                    Definition::Struct { ref fields } => {
+                        _serde::Serializer::serialize_newtype_variant(
+                            __serializer,
+                            "DefinitionDef",
+                            4u32,
+                            "Struct",
+                            {
+                                #[doc(hidden)]
+                                struct __SerializeWith<'__a> {
+                                    values: (&'__a Fields,),
+                                    phantom: _serde::__private::PhantomData<Definition>,
+                                }
+                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
+                                    fn serialize<__S>(
+                                        &self,
+                                        __s: __S,
+                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
+                                    where
+                                        __S: _serde::Serializer,
+                                    {
+                                        transparent_fields::serialize(self.values.0, __s)
+                                    }
+                                }
+                                &__SerializeWith {
+                                    values: (fields,),
+                                    phantom: _serde::__private::PhantomData::<Definition>,
+                                }
+                            },
+                        )
+                    }
+                    _ => {
+                        unreachable!("new `borsh::schema::Definition` variant(s)")
+                        // `non_exhaustive` match
+                    }
+                }
+            }
+        }
+    };
+
+    #[derive(Deserialize)]
     #[serde(remote = "Definition")]
     enum DefinitionDef {
         Array {
@@ -460,7 +628,6 @@ mod borsh_serde {
     /// `transparent` in combination with `#[serde(with = "...")]. Instead we have do it in this
     /// roundabout way.
     mod transparent_fields {
-        use super::borsh_clone;
         use borsh::schema::{Declaration, FieldName, Fields};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -479,7 +646,7 @@ mod borsh_serde {
         where
             S: Serializer,
         {
-            HelperFields(borsh_clone::clone_fields(fields)).serialize(serializer)
+            HelperFields(fields.clone()).serialize(serializer)
         }
 
         pub fn deserialize<'de, D>(deserializer: D) -> Result<Fields, D::Error>
@@ -491,7 +658,7 @@ mod borsh_serde {
     }
 
     pub fn serialize<S>(
-        map: &HashMap<Declaration, Definition>,
+        map: &BTreeMap<Declaration, Definition>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -499,18 +666,18 @@ mod borsh_serde {
     {
         let mut map_ser = serializer.serialize_map(Some(map.len()))?;
         for (k, v) in map {
-            map_ser.serialize_entry(k, &HelperDefinition(borsh_clone::clone_definition(v)))?;
+            map_ser.serialize_entry(k, &HelperDefinition(v.clone()))?;
         }
         map_ser.end()
     }
 
     pub fn deserialize<'de, D>(
         deserializer: D,
-    ) -> Result<HashMap<Declaration, Definition>, D::Error>
+    ) -> Result<BTreeMap<Declaration, Definition>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let map = HashMap::<Declaration, HelperDefinition>::deserialize(deserializer)?;
+        let map = BTreeMap::<Declaration, HelperDefinition>::deserialize(deserializer)?;
         Ok(map
             .into_iter()
             .map(|(k, HelperDefinition(v))| (k, v))
@@ -523,6 +690,14 @@ mod tests {
     use super::*;
     use borsh::BorshSchema;
     use serde_json::Value;
+
+    fn get_definitions(type_schema: &BorshSchemaContainer) -> BTreeMap<Declaration, Definition> {
+        let definitions: BTreeMap<Declaration, Definition> = type_schema
+            .definitions()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        definitions
+    }
 
     #[test]
     fn test_serde_array() {
@@ -550,10 +725,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Array<u32, 2>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Array<u32, 2>");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Array<u32, 2>").unwrap(),
+                definitions.get("Array<u32, 2>").unwrap(),
                 &Definition::Array {
                     length: 2,
                     elements: "u32".to_string()
@@ -587,10 +763,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Vec<u32>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Vec<u32>");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Vec<u32>").unwrap(),
+                definitions.get("Vec<u32>").unwrap(),
                 &Definition::Sequence {
                     elements: "u32".to_string()
                 }
@@ -623,10 +800,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Tuple<u32, u32>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Tuple<u32, u32>");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Tuple<u32, u32>").unwrap(),
+                definitions.get("Tuple<u32, u32>").unwrap(),
                 &Definition::Tuple {
                     elements: vec!["u32".to_string(), "u32".to_string()]
                 }
@@ -673,10 +851,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Either".to_string());
-            assert_eq!(type_schema.definitions.len(), 3);
+            assert_eq!(type_schema.declaration(), "Either");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 3);
             assert_eq!(
-                type_schema.definitions.get("Either").unwrap(),
+                definitions.get("Either").unwrap(),
                 &Definition::Enum {
                     variants: vec![
                         ("_Left".to_string(), "Either_Left".to_string()),
@@ -720,10 +899,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Pair".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Pair");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Pair").unwrap(),
+                definitions.get("Pair").unwrap(),
                 &Definition::Struct {
                     fields: Fields::NamedFields(vec![
                         ("_first".to_string(), "u32".to_string()),
@@ -764,10 +944,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Pair".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Pair");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Pair").unwrap(),
+                definitions.get("Pair").unwrap(),
                 &Definition::Struct {
                     fields: Fields::UnnamedFields(vec!["u32".to_string(), "u32".to_string()])
                 }
@@ -802,10 +983,11 @@ mod tests {
         assert_eq!(value, expected_value);
 
         if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Unit".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+            assert_eq!(type_schema.declaration(), "Unit");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Unit").unwrap(),
+                definitions.get("Unit").unwrap(),
                 &Definition::Struct {
                     fields: Fields::Empty
                 }
@@ -862,10 +1044,11 @@ mod tests {
 
         let param = serde_json::from_str::<AbiBorshParameter>(expected_json).unwrap();
         assert_eq!(param.name, "foo");
-        assert_eq!(param.type_schema.declaration, "Unit".to_string());
-        assert_eq!(param.type_schema.definitions.len(), 1);
+        assert_eq!(param.type_schema.declaration(), "Unit");
+        let definitions = get_definitions(&param.type_schema);
+        assert_eq!(definitions.len(), 1);
         assert_eq!(
-            param.type_schema.definitions.get("Unit").unwrap(),
+            definitions.get("Unit").unwrap(),
             &Definition::Struct {
                 fields: Fields::Empty
             }
