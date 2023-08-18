@@ -1025,7 +1025,7 @@ mod tests {
             name: "foo".to_string(),
             type_schema: <Unit>::schema_container(),
         };
-        let value = serde_json::to_value(&expected_param).unwrap();
+        let value = serde_json::to_value(expected_param).unwrap();
         let expected_json = r#"
           {
             "name": "foo",
