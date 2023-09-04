@@ -353,228 +353,7 @@ mod borsh_serde {
         }
     }
 
-    // impl DefinitionDef { fn serialize<__S>( __self: &Definition, __serializer: __S, ) -> _serde::__private::Result<__S::Ok, __S::Error>
-    // is expansion of
-    // #[derive(Seserialize)]
-    // #[serde(remote = "Definition")]
-    // enum DefinitionDef {
-    // plus non_exhaustive match
-    #[doc(hidden)]
-    #[allow(
-        non_upper_case_globals,
-        unused_attributes,
-        unused_qualifications,
-        clippy::all
-    )]
-    const _: () = {
-        #[allow(unused_extern_crates, clippy::useless_attribute)]
-        extern crate serde as _serde;
-        impl DefinitionDef {
-            fn serialize<__S>(
-                __self: &Definition,
-                __serializer: __S,
-            ) -> _serde::__private::Result<__S::Ok, __S::Error>
-            where
-                __S: _serde::Serializer,
-            {
-                match _serde::__private::None::<&DefinitionDef> {
-                    _serde::__private::Some(DefinitionDef::Array {
-                        length: __v0,
-                        elements: __v1,
-                    }) => {}
-                    _serde::__private::Some(DefinitionDef::Sequence { elements: __v0 }) => {}
-                    _serde::__private::Some(DefinitionDef::Tuple { elements: __v0 }) => {}
-                    _serde::__private::Some(DefinitionDef::Enum { variants: __v0 }) => {}
-                    _serde::__private::Some(DefinitionDef::Struct { fields: __v0 }) => {}
-                    _ => {}
-                }
-                match _serde::__private::None {
-                    _serde::__private::Some((__v0, __v1)) => {
-                        let _ = DefinitionDef::Array {
-                            length: __v0,
-                            elements: __v1,
-                        };
-                    }
-                    _ => {}
-                }
-                match _serde::__private::None {
-                    _serde::__private::Some((__v0,)) => {
-                        let _ = DefinitionDef::Sequence { elements: __v0 };
-                    }
-                    _ => {}
-                }
-                match _serde::__private::None {
-                    _serde::__private::Some((__v0,)) => {
-                        let _ = DefinitionDef::Tuple { elements: __v0 };
-                    }
-                    _ => {}
-                }
-                match _serde::__private::None {
-                    _serde::__private::Some((__v0,)) => {
-                        let _ = DefinitionDef::Enum { variants: __v0 };
-                    }
-                    _ => {}
-                }
-                match _serde::__private::None {
-                    _serde::__private::Some((__v0,)) => {
-                        let _ = DefinitionDef::Struct { fields: __v0 };
-                    }
-                    _ => {}
-                }
-                match *__self {
-                    Definition::Array {
-                        ref length,
-                        ref elements,
-                    } => {
-                        let mut __serde_state = _serde::Serializer::serialize_struct_variant(
-                            __serializer,
-                            "DefinitionDef",
-                            0u32,
-                            "Array",
-                            0 + 1 + 1,
-                        )?;
-                        _serde::ser::SerializeStructVariant::serialize_field(
-                            &mut __serde_state,
-                            "length",
-                            length,
-                        )?;
-                        _serde::ser::SerializeStructVariant::serialize_field(
-                            &mut __serde_state,
-                            "elements",
-                            elements,
-                        )?;
-                        _serde::ser::SerializeStructVariant::end(__serde_state)
-                    }
-                    Definition::Sequence { ref elements } => {
-                        _serde::Serializer::serialize_newtype_variant(
-                            __serializer,
-                            "DefinitionDef",
-                            1u32,
-                            "Sequence",
-                            {
-                                #[doc(hidden)]
-                                struct __SerializeWith<'__a> {
-                                    values: (&'__a Declaration,),
-                                    phantom: _serde::__private::PhantomData<Definition>,
-                                }
-                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
-                                    fn serialize<__S>(
-                                        &self,
-                                        __s: __S,
-                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
-                                    where
-                                        __S: _serde::Serializer,
-                                    {
-                                        transparent::serialize(self.values.0, __s)
-                                    }
-                                }
-                                &__SerializeWith {
-                                    values: (elements,),
-                                    phantom: _serde::__private::PhantomData::<Definition>,
-                                }
-                            },
-                        )
-                    }
-                    Definition::Tuple { ref elements } => {
-                        _serde::Serializer::serialize_newtype_variant(
-                            __serializer,
-                            "DefinitionDef",
-                            2u32,
-                            "Tuple",
-                            {
-                                #[doc(hidden)]
-                                struct __SerializeWith<'__a> {
-                                    values: (&'__a Vec<Declaration>,),
-                                    phantom: _serde::__private::PhantomData<Definition>,
-                                }
-                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
-                                    fn serialize<__S>(
-                                        &self,
-                                        __s: __S,
-                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
-                                    where
-                                        __S: _serde::Serializer,
-                                    {
-                                        transparent::serialize(self.values.0, __s)
-                                    }
-                                }
-                                &__SerializeWith {
-                                    values: (elements,),
-                                    phantom: _serde::__private::PhantomData::<Definition>,
-                                }
-                            },
-                        )
-                    }
-                    Definition::Enum { ref variants } => {
-                        _serde::Serializer::serialize_newtype_variant(
-                            __serializer,
-                            "DefinitionDef",
-                            3u32,
-                            "Enum",
-                            {
-                                #[doc(hidden)]
-                                struct __SerializeWith<'__a> {
-                                    values: (&'__a Vec<(VariantName, Declaration)>,),
-                                    phantom: _serde::__private::PhantomData<Definition>,
-                                }
-                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
-                                    fn serialize<__S>(
-                                        &self,
-                                        __s: __S,
-                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
-                                    where
-                                        __S: _serde::Serializer,
-                                    {
-                                        transparent::serialize(self.values.0, __s)
-                                    }
-                                }
-                                &__SerializeWith {
-                                    values: (variants,),
-                                    phantom: _serde::__private::PhantomData::<Definition>,
-                                }
-                            },
-                        )
-                    }
-                    Definition::Struct { ref fields } => {
-                        _serde::Serializer::serialize_newtype_variant(
-                            __serializer,
-                            "DefinitionDef",
-                            4u32,
-                            "Struct",
-                            {
-                                #[doc(hidden)]
-                                struct __SerializeWith<'__a> {
-                                    values: (&'__a Fields,),
-                                    phantom: _serde::__private::PhantomData<Definition>,
-                                }
-                                impl<'__a> _serde::Serialize for __SerializeWith<'__a> {
-                                    fn serialize<__S>(
-                                        &self,
-                                        __s: __S,
-                                    ) -> _serde::__private::Result<__S::Ok, __S::Error>
-                                    where
-                                        __S: _serde::Serializer,
-                                    {
-                                        transparent_fields::serialize(self.values.0, __s)
-                                    }
-                                }
-                                &__SerializeWith {
-                                    values: (fields,),
-                                    phantom: _serde::__private::PhantomData::<Definition>,
-                                }
-                            },
-                        )
-                    }
-                    _ => {
-                        unreachable!("new `borsh::schema::Definition` variant(s)")
-                        // `non_exhaustive` match
-                    }
-                }
-            }
-        }
-    };
-
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     #[serde(remote = "Definition")]
     enum DefinitionDef {
         Array {
@@ -702,7 +481,7 @@ mod tests {
     #[test]
     fn test_serde_array() {
         let abi_type = AbiType::Borsh {
-            type_schema: <[u32; 2]>::schema_container(),
+            type_schema: borsh::schema_container_of::<[u32; 2]>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -743,7 +522,7 @@ mod tests {
     #[test]
     fn test_serde_sequence() {
         let abi_type = AbiType::Borsh {
-            type_schema: <Vec<u32>>::schema_container(),
+            type_schema: borsh::schema_container_of::<Vec<u32>>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -780,7 +559,7 @@ mod tests {
     #[test]
     fn test_serde_tuple() {
         let abi_type = AbiType::Borsh {
-            type_schema: <(u32, u32)>::schema_container(),
+            type_schema: borsh::schema_container_of::<(u32, u32)>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -822,7 +601,7 @@ mod tests {
             _Right(u32),
         }
         let abi_type = AbiType::Borsh {
-            type_schema: <Either>::schema_container(),
+            type_schema: borsh::schema_container_of::<Either>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -876,7 +655,7 @@ mod tests {
             _second: u32,
         }
         let abi_type = AbiType::Borsh {
-            type_schema: <Pair>::schema_container(),
+            type_schema: borsh::schema_container_of::<Pair>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -921,7 +700,7 @@ mod tests {
         #[derive(BorshSchema)]
         struct Pair(u32, u32);
         let abi_type = AbiType::Borsh {
-            type_schema: <Pair>::schema_container(),
+            type_schema: borsh::schema_container_of::<Pair>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -963,7 +742,7 @@ mod tests {
         #[derive(BorshSchema)]
         struct Unit;
         let abi_type = AbiType::Borsh {
-            type_schema: <Unit>::schema_container(),
+            type_schema: borsh::schema_container_of::<Unit>(),
         };
         let value = serde_json::to_value(&abi_type).unwrap();
         let expected_json = r#"
@@ -1023,7 +802,7 @@ mod tests {
         struct Unit;
         let expected_param = AbiBorshParameter {
             name: "foo".to_string(),
-            type_schema: <Unit>::schema_container(),
+            type_schema: borsh::schema_container_of::<Unit>(),
         };
         let value = serde_json::to_value(expected_param).unwrap();
         let expected_json = r#"
