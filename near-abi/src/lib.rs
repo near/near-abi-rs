@@ -1,9 +1,11 @@
-use borsh::schema::{BorshSchemaContainer, Declaration, Definition, Fields, VariantName};
+use borsh::schema::{
+    BorshSchemaContainer, Declaration, Definition, DiscriminantValue, Fields, VariantName,
+};
 use schemars::schema::{RootSchema, Schema};
 use schemars::JsonSchema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[doc(hidden)]
 #[cfg(feature = "__chunked-entries")]
@@ -13,14 +15,14 @@ pub mod __private;
 // Keep in sync with SCHEMA_VERSION below.
 const SCHEMA_SEMVER: Version = Version {
     major: 0,
-    minor: 3,
+    minor: 4,
     patch: 0,
     pre: semver::Prerelease::EMPTY,
     build: semver::BuildMetadata::EMPTY,
 };
 
 /// Current version of the ABI schema format.
-pub const SCHEMA_VERSION: &str = "0.3.0";
+pub const SCHEMA_VERSION: &str = "0.4.0";
 
 /// Contract ABI.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
@@ -188,7 +190,7 @@ pub struct AbiJsonParameter {
 }
 
 /// Information about a single named Borsh function parameter.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AbiBorshParameter {
     /// Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).
@@ -234,27 +236,8 @@ impl JsonSchema for AbiBorshParameter {
     }
 }
 
-// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
-impl Clone for AbiBorshParameter {
-    fn clone(&self) -> Self {
-        let type_schema = BorshSchemaContainer {
-            declaration: self.type_schema.declaration.clone(),
-            definitions: self
-                .type_schema
-                .definitions
-                .iter()
-                .map(|(k, v)| (k.clone(), borsh_clone::clone_definition(v)))
-                .collect(),
-        };
-        Self {
-            name: self.name.clone(),
-            type_schema,
-        }
-    }
-}
-
 /// Information about a single type (e.g. return type).
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "serialization_type")]
 #[serde(rename_all = "lowercase")]
 #[serde(deny_unknown_fields)]
@@ -334,96 +317,60 @@ impl JsonSchema for AbiType {
     }
 }
 
-// FIXME: Can be dropped once https://github.com/near/borsh-rs/pull/97 is released
-impl Clone for AbiType {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Json { type_schema } => Self::Json {
-                type_schema: type_schema.clone(),
-            },
-            Self::Borsh { type_schema } => {
-                let type_schema = BorshSchemaContainer {
-                    declaration: type_schema.declaration.clone(),
-                    definitions: type_schema
-                        .definitions
-                        .iter()
-                        .map(|(k, v)| (k.clone(), borsh_clone::clone_definition(v)))
-                        .collect(),
-                };
-                Self::Borsh { type_schema }
-            }
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "BorshSchemaContainer")]
 struct BorshSchemaContainerDef {
+    #[serde(getter = "borsh_serde::getters::declaration")]
     declaration: Declaration,
-    #[serde(with = "borsh_serde")]
-    definitions: HashMap<Declaration, Definition>,
+    #[serde(with = "borsh_serde", getter = "borsh_serde::getters::definitions")]
+    definitions: BTreeMap<Declaration, Definition>,
 }
 
-/// Cloning functions for borsh types.
-mod borsh_clone {
-    use borsh::schema::{Definition, Fields};
-
-    pub fn clone_fields(fields: &Fields) -> Fields {
-        match fields {
-            Fields::Empty => Fields::Empty,
-            Fields::NamedFields(f) => Fields::NamedFields(f.clone()),
-            Fields::UnnamedFields(f) => Fields::UnnamedFields(f.clone()),
-        }
-    }
-
-    pub fn clone_definition(definition: &Definition) -> Definition {
-        match definition {
-            Definition::Array { length, elements } => Definition::Array {
-                length: *length,
-                elements: elements.clone(),
-            },
-            Definition::Sequence { elements } => Definition::Sequence {
-                elements: elements.clone(),
-            },
-            Definition::Tuple { elements } => Definition::Tuple {
-                elements: elements.clone(),
-            },
-            Definition::Enum { variants } => Definition::Enum {
-                variants: variants.clone(),
-            },
-            Definition::Struct { fields } => Definition::Struct {
-                fields: clone_fields(fields),
-            },
-        }
+impl From<BorshSchemaContainerDef> for BorshSchemaContainer {
+    fn from(value: BorshSchemaContainerDef) -> Self {
+        Self::new(value.declaration, value.definitions)
     }
 }
 
 /// This submodules follows <https://serde.rs/remote-derive.html> to derive Serialize/Deserialize for
-/// `BorshSchemaContainer` parameters. The top-level serialization type is `HashMap<Declaration, Definition>`
+/// `BorshSchemaContainer` parameters. The top-level serialization type is `BTreeMap<Declaration, Definition>`
 /// for the sake of being easily plugged into `BorshSchemaContainerDef` (see its parameters).
 mod borsh_serde {
     use super::*;
     use serde::ser::SerializeMap;
     use serde::{Deserializer, Serializer};
+    pub mod getters {
+        use super::*;
+
+        pub fn declaration(obj: &BorshSchemaContainer) -> &Declaration {
+            obj.declaration()
+        }
+
+        pub fn definitions(obj: &BorshSchemaContainer) -> BTreeMap<Declaration, Definition> {
+            let definitions: BTreeMap<Declaration, Definition> = obj
+                .definitions()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            definitions
+        }
+    }
 
     #[derive(Serialize, Deserialize)]
     #[serde(remote = "Definition")]
     enum DefinitionDef {
-        Array {
-            length: u32,
-            elements: Declaration,
-        },
-        #[serde(with = "transparent")]
+        Primitive(u8),
         Sequence {
+            length_width: u8,
+            length_range: core::ops::RangeInclusive<u64>,
             elements: Declaration,
         },
         #[serde(with = "transparent")]
         Tuple {
             elements: Vec<Declaration>,
         },
-        #[serde(with = "transparent")]
         Enum {
-            variants: Vec<(VariantName, Declaration)>,
+            tag_width: u8,
+            variants: Vec<(DiscriminantValue, VariantName, Declaration)>,
         },
         #[serde(with = "transparent_fields")]
         Struct {
@@ -460,7 +407,6 @@ mod borsh_serde {
     /// `transparent` in combination with `#[serde(with = "...")]. Instead we have do it in this
     /// roundabout way.
     mod transparent_fields {
-        use super::borsh_clone;
         use borsh::schema::{Declaration, FieldName, Fields};
         use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -479,7 +425,7 @@ mod borsh_serde {
         where
             S: Serializer,
         {
-            HelperFields(borsh_clone::clone_fields(fields)).serialize(serializer)
+            HelperFields(fields.clone()).serialize(serializer)
         }
 
         pub fn deserialize<'de, D>(deserializer: D) -> Result<Fields, D::Error>
@@ -491,7 +437,7 @@ mod borsh_serde {
     }
 
     pub fn serialize<S>(
-        map: &HashMap<Declaration, Definition>,
+        map: &BTreeMap<Declaration, Definition>,
         serializer: S,
     ) -> Result<S::Ok, S::Error>
     where
@@ -499,18 +445,18 @@ mod borsh_serde {
     {
         let mut map_ser = serializer.serialize_map(Some(map.len()))?;
         for (k, v) in map {
-            map_ser.serialize_entry(k, &HelperDefinition(borsh_clone::clone_definition(v)))?;
+            map_ser.serialize_entry(k, &HelperDefinition(v.clone()))?;
         }
         map_ser.end()
     }
 
     pub fn deserialize<'de, D>(
         deserializer: D,
-    ) -> Result<HashMap<Declaration, Definition>, D::Error>
+    ) -> Result<BTreeMap<Declaration, Definition>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let map = HashMap::<Declaration, HelperDefinition>::deserialize(deserializer)?;
+        let map = BTreeMap::<Declaration, HelperDefinition>::deserialize(deserializer)?;
         Ok(map
             .into_iter()
             .map(|(k, HelperDefinition(v))| (k, v))
@@ -522,165 +468,116 @@ mod borsh_serde {
 mod tests {
     use super::*;
     use borsh::BorshSchema;
-    use serde_json::Value;
 
-    #[test]
-    fn test_serde_array() {
-        let abi_type = AbiType::Borsh {
-            type_schema: <[u32; 2]>::schema_container(),
-        };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Array<u32, 2>",
-              "definitions": {
-                "Array<u32, 2>": {
-                  "Array": {
-                    "length": 2,
-                    "elements": "u32"
-                  }
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
-
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Array<u32, 2>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
-            assert_eq!(
-                type_schema.definitions.get("Array<u32, 2>").unwrap(),
-                &Definition::Array {
-                    length: 2,
-                    elements: "u32".to_string()
-                }
-            );
-        } else {
-            panic!("Unexpected serialization type")
-        }
+    fn get_definitions(type_schema: &BorshSchemaContainer) -> BTreeMap<Declaration, Definition> {
+        let definitions: BTreeMap<Declaration, Definition> = type_schema
+            .definitions()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        definitions
     }
 
     #[test]
-    fn test_serde_sequence() {
+    fn test_serde_abitype_borsh_array() {
         let abi_type = AbiType::Borsh {
-            type_schema: <Vec<u32>>::schema_container(),
+            type_schema: borsh::schema_container_of::<[u32; 2]>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Vec<u32>",
-              "definitions": {
-                "Vec<u32>": {
-                  "Sequence": "u32"
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Vec<u32>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "[u32; 2]");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 2);
             assert_eq!(
-                type_schema.definitions.get("Vec<u32>").unwrap(),
+                definitions.get("[u32; 2]").unwrap(),
                 &Definition::Sequence {
+                    length_width: 0,
+                    length_range: 2..=2,
                     elements: "u32".to_string()
                 }
             );
+
+            assert_eq!(definitions.get("u32").unwrap(), &Definition::Primitive(4));
         } else {
             panic!("Unexpected serialization type")
         }
     }
 
     #[test]
-    fn test_serde_tuple() {
+    fn test_serde_abitype_borsh_sequence() {
         let abi_type = AbiType::Borsh {
-            type_schema: <(u32, u32)>::schema_container(),
+            type_schema: borsh::schema_container_of::<Vec<u32>>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Tuple<u32, u32>",
-              "definitions": {
-                "Tuple<u32, u32>": {
-                  "Tuple": ["u32", "u32"]
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Tuple<u32, u32>".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "Vec<u32>");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 2);
             assert_eq!(
-                type_schema.definitions.get("Tuple<u32, u32>").unwrap(),
+                definitions.get("Vec<u32>").unwrap(),
+                &Definition::Sequence {
+                    length_width: Definition::DEFAULT_LENGTH_WIDTH,
+                    length_range: Definition::DEFAULT_LENGTH_RANGE,
+                    elements: "u32".to_string()
+                }
+            );
+            assert_eq!(definitions.get("u32").unwrap(), &Definition::Primitive(4));
+        } else {
+            panic!("Unexpected serialization type")
+        }
+    }
+
+    #[test]
+    fn test_serde_abitype_borsh_tuple() {
+        let abi_type = AbiType::Borsh {
+            type_schema: borsh::schema_container_of::<(u32, u32)>(),
+        };
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
+
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "(u32, u32)");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 2);
+            assert_eq!(
+                definitions.get("(u32, u32)").unwrap(),
                 &Definition::Tuple {
                     elements: vec!["u32".to_string(), "u32".to_string()]
                 }
             );
+            assert_eq!(definitions.get("u32").unwrap(), &Definition::Primitive(4));
         } else {
             panic!("Unexpected serialization type")
         }
     }
 
     #[test]
-    fn test_deser_enum() {
+    fn test_serde_abitype_borsh_enum() {
         #[derive(BorshSchema)]
         enum Either {
             _Left(u32),
             _Right(u32),
         }
         let abi_type = AbiType::Borsh {
-            type_schema: <Either>::schema_container(),
+            type_schema: borsh::schema_container_of::<Either>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Either",
-              "definitions": {
-                "Either": {
-                  "Enum": [
-                    ["_Left", "Either_Left"],
-                    ["_Right", "Either_Right"]
-                  ]
-                },
-                "Either_Left": {
-                  "Struct": ["u32"]
-                },
-                "Either_Right": {
-                  "Struct": ["u32"]
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Either".to_string());
-            assert_eq!(type_schema.definitions.len(), 3);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "Either");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 4);
             assert_eq!(
-                type_schema.definitions.get("Either").unwrap(),
+                definitions.get("Either").unwrap(),
                 &Definition::Enum {
+                    tag_width: 1,
                     variants: vec![
-                        ("_Left".to_string(), "Either_Left".to_string()),
-                        ("_Right".to_string(), "Either_Right".to_string())
+                        (0, "_Left".to_string(), "Either_Left".to_string()),
+                        (1, "_Right".to_string(), "Either_Right".to_string())
                     ]
                 }
             );
@@ -690,40 +587,24 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_struct_named() {
+    fn test_serde_abitype_borsh_struct_named() {
         #[derive(BorshSchema)]
         struct Pair {
             _first: u32,
             _second: u32,
         }
         let abi_type = AbiType::Borsh {
-            type_schema: <Pair>::schema_container(),
+            type_schema: borsh::schema_container_of::<Pair>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Pair",
-              "definitions": {
-                "Pair": {
-                  "Struct": [
-                    ["_first", "u32"],
-                    ["_second", "u32"]
-                  ]
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Pair".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "Pair");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 2);
             assert_eq!(
-                type_schema.definitions.get("Pair").unwrap(),
+                definitions.get("Pair").unwrap(),
                 &Definition::Struct {
                     fields: Fields::NamedFields(vec![
                         ("_first".to_string(), "u32".to_string()),
@@ -737,37 +618,21 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_struct_unnamed() {
+    fn test_serde_abitype_borsh_struct_unnamed() {
         #[derive(BorshSchema)]
         struct Pair(u32, u32);
         let abi_type = AbiType::Borsh {
-            type_schema: <Pair>::schema_container(),
+            type_schema: borsh::schema_container_of::<Pair>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Pair",
-              "definitions": {
-                "Pair": {
-                  "Struct": [
-                    "u32",
-                    "u32"
-                  ]
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Pair".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "Pair");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 2);
             assert_eq!(
-                type_schema.definitions.get("Pair").unwrap(),
+                definitions.get("Pair").unwrap(),
                 &Definition::Struct {
                     fields: Fields::UnnamedFields(vec!["u32".to_string(), "u32".to_string()])
                 }
@@ -778,34 +643,21 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_struct_empty() {
+    fn test_serde_abitype_borsh_struct_empty() {
         #[derive(BorshSchema)]
         struct Unit;
         let abi_type = AbiType::Borsh {
-            type_schema: <Unit>::schema_container(),
+            type_schema: borsh::schema_container_of::<Unit>(),
         };
-        let value = serde_json::to_value(&abi_type).unwrap();
-        let expected_json = r#"
-          {
-            "serialization_type": "borsh",
-            "type_schema": {
-              "declaration": "Unit",
-              "definitions": {
-                "Unit": {
-                  "Struct": null
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
+        let expected_json_str = serde_json::to_string_pretty(&abi_type).unwrap();
+        insta::assert_snapshot!(expected_json_str);
 
-        if let AbiType::Borsh { type_schema } = serde_json::from_str(expected_json).unwrap() {
-            assert_eq!(type_schema.declaration, "Unit".to_string());
-            assert_eq!(type_schema.definitions.len(), 1);
+        if let AbiType::Borsh { type_schema } = serde_json::from_str(&expected_json_str).unwrap() {
+            assert_eq!(type_schema.declaration(), "Unit");
+            let definitions = get_definitions(&type_schema);
+            assert_eq!(definitions.len(), 1);
             assert_eq!(
-                type_schema.definitions.get("Unit").unwrap(),
+                definitions.get("Unit").unwrap(),
                 &Definition::Struct {
                     fields: Fields::Empty
                 }
@@ -816,7 +668,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_unknown_fields() {
+    fn test_de_error_abitype_unknown_fields() {
         let json = r#"
           {
             "serialization_type": "borsh",
@@ -836,36 +688,24 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_param() {
+    fn test_serde_abiborshparameter_struct_empty() {
         #[derive(BorshSchema)]
         struct Unit;
         let expected_param = AbiBorshParameter {
             name: "foo".to_string(),
-            type_schema: <Unit>::schema_container(),
+            type_schema: borsh::schema_container_of::<Unit>(),
         };
-        let value = serde_json::to_value(&expected_param).unwrap();
-        let expected_json = r#"
-          {
-            "name": "foo",
-            "type_schema": {
-              "declaration": "Unit",
-              "definitions": {
-                "Unit": {
-                  "Struct": null
-                }
-              }
-            }
-          }
-        "#;
-        let expected_value: Value = serde_json::from_str(expected_json).unwrap();
-        assert_eq!(value, expected_value);
 
-        let param = serde_json::from_str::<AbiBorshParameter>(expected_json).unwrap();
+        let expected_json_str = serde_json::to_string_pretty(&expected_param).unwrap();
+        insta::assert_snapshot!(expected_json_str);
+
+        let param = serde_json::from_str::<AbiBorshParameter>(&expected_json_str).unwrap();
         assert_eq!(param.name, "foo");
-        assert_eq!(param.type_schema.declaration, "Unit".to_string());
-        assert_eq!(param.type_schema.definitions.len(), 1);
+        assert_eq!(param.type_schema.declaration(), "Unit");
+        let definitions = get_definitions(&param.type_schema);
+        assert_eq!(definitions.len(), 1);
         assert_eq!(
-            param.type_schema.definitions.get("Unit").unwrap(),
+            definitions.get("Unit").unwrap(),
             &Definition::Struct {
                 fields: Fields::Empty
             }
@@ -873,7 +713,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deser_param_unknown_fields() {
+    fn test_de_error_abiborshparameter_unknown_fields() {
         let json = r#"
           {
             "name": "foo",
@@ -893,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    fn test_correct_version() {
+    fn test_de_abiroot_correct_version() {
         let json = format!(
             r#"
             {{
@@ -912,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    fn test_older_version() {
+    fn test_de_error_abiroot_older_version() {
         let json = r#"
           {
             "schema_version": "0.0.1",
@@ -931,7 +771,7 @@ mod tests {
     }
 
     #[test]
-    fn test_newer_version() {
+    fn test_de_error_abiroot_newer_version() {
         let json = r#"
           {
             "schema_version": "99.99.99",

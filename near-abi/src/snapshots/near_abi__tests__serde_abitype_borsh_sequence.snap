@@ -1,0 +1,25 @@
+---
+source: near-abi/src/lib.rs
+expression: expected_json_str
+---
+{
+  "serialization_type": "borsh",
+  "type_schema": {
+    "declaration": "Vec<u32>",
+    "definitions": {
+      "Vec<u32>": {
+        "Sequence": {
+          "length_width": 4,
+          "length_range": {
+            "start": 0,
+            "end": 4294967295
+          },
+          "elements": "u32"
+        }
+      },
+      "u32": {
+        "Primitive": 4
+      }
+    }
+  }
+}

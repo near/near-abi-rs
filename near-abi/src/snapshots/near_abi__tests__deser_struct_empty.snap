@@ -1,0 +1,15 @@
+---
+source: near-abi/src/lib.rs
+expression: expected_json_str
+---
+{
+  "serialization_type": "borsh",
+  "type_schema": {
+    "declaration": "Unit",
+    "definitions": {
+      "Unit": {
+        "Struct": null
+      }
+    }
+  }
+}

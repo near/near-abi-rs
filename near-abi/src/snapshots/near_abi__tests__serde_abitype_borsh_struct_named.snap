@@ -1,0 +1,27 @@
+---
+source: near-abi/src/lib.rs
+expression: expected_json_str
+---
+{
+  "serialization_type": "borsh",
+  "type_schema": {
+    "declaration": "Pair",
+    "definitions": {
+      "Pair": {
+        "Struct": [
+          [
+            "_first",
+            "u32"
+          ],
+          [
+            "_second",
+            "u32"
+          ]
+        ]
+      },
+      "u32": {
+        "Primitive": 4
+      }
+    }
+  }
+}

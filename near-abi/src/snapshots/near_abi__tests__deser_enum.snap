@@ -1,0 +1,42 @@
+---
+source: near-abi/src/lib.rs
+expression: expected_json_str
+---
+{
+  "serialization_type": "borsh",
+  "type_schema": {
+    "declaration": "Either",
+    "definitions": {
+      "Either": {
+        "Enum": {
+          "tag_width": 1,
+          "variants": [
+            [
+              0,
+              "_Left",
+              "Either_Left"
+            ],
+            [
+              1,
+              "_Right",
+              "Either_Right"
+            ]
+          ]
+        }
+      },
+      "Either_Left": {
+        "Struct": [
+          "u32"
+        ]
+      },
+      "Either_Right": {
+        "Struct": [
+          "u32"
+        ]
+      },
+      "u32": {
+        "Primitive": 4
+      }
+    }
+  }
+}
