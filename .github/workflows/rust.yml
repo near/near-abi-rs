@@ -30,7 +30,8 @@ jobs:
         run: |
           cargo update -p toml_edit --precise 0.20.2
           cargo update -p toml_datetime --precise 0.6.3
-
+          cargo update -p borsh --precise 1.1.0
+          
       - run: cargo check
 
   tests:
