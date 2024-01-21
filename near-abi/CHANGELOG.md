@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2](https://github.com/near/near-abi-rs/compare/near-abi-v0.4.1...near-abi-v0.4.2) - 2024-01-21
+
+### Other
+- `borsh` version range update ([#31](https://github.com/near/near-abi-rs/pull/31))
+
 ## [0.4.1](https://github.com/near/near-abi-rs/compare/near-abi-v0.4.0...near-abi-v0.4.1) - 2023-10-30
 
 ### Other
