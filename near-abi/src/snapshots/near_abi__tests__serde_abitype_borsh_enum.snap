@@ -14,22 +14,22 @@ expression: expected_json_str
             [
               0,
               "_Left",
-              "Either_Left"
+              "Either___Left"
             ],
             [
               1,
               "_Right",
-              "Either_Right"
+              "Either___Right"
             ]
           ]
         }
       },
-      "Either_Left": {
+      "Either___Left": {
         "Struct": [
           "u32"
         ]
       },
-      "Either_Right": {
+      "Either___Right": {
         "Struct": [
           "u32"
         ]

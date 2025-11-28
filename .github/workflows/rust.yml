@@ -25,12 +25,9 @@ jobs:
           toolchain: ${{ env.RUST_MSRV }}
           default: true
 
-      - name: downgrade `toml_datetime` crate to support older Rust toolchain
-        if: ${{ env.RUST_MSRV }} == '1.66.0' 
+      - name: downgrade crates to support older Rust toolchain
         run: |
-          cargo update -p borsh --precise 1.1.0
-          cargo update -p toml_edit --precise 0.20.2
-          cargo update -p toml_datetime --precise 0.6.3
+          cargo update -p indexmap@2.12.1 --precise 2.11.4
 
       - run: cargo check
 
