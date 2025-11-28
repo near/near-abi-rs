@@ -576,8 +576,8 @@ mod tests {
                 &Definition::Enum {
                     tag_width: 1,
                     variants: vec![
-                        (0, "_Left".to_string(), "Either_Left".to_string()),
-                        (1, "_Right".to_string(), "Either_Right".to_string())
+                        (0, "_Left".to_string(), "Either___Left".to_string()),
+                        (1, "_Right".to_string(), "Either___Right".to_string())
                     ]
                 }
             );
