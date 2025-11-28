@@ -25,6 +25,10 @@ jobs:
           toolchain: ${{ env.RUST_MSRV }}
           default: true
 
+      - name: downgrade crates to support older Rust toolchain
+        run: |
+          cargo update -p indexmap@2.12.1 --precise 2.11.4
+
       - run: cargo check
 
   tests:
