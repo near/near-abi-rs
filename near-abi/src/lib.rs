@@ -1,10 +1,10 @@
 use borsh::schema::{
     BorshSchemaContainer, Declaration, Definition, DiscriminantValue, Fields, VariantName,
 };
-use schemars::schema::{RootSchema, Schema};
 use schemars::JsonSchema;
+use schemars::schema::{RootSchema, Schema};
 use semver::Version;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::collections::{BTreeMap, HashMap};
 
 #[doc(hidden)]
@@ -205,8 +205,8 @@ impl JsonSchema for AbiBorshParameter {
         "AbiBorshParameter".to_string()
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        let mut name_schema_object = <String as JsonSchema>::json_schema(gen).into_object();
+    fn json_schema(schema_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
+        let mut name_schema_object = <String as JsonSchema>::json_schema(schema_gen).into_object();
         name_schema_object.metadata().description =
             Some("Parameter name (e.g. `p1` in `fn foo(p1: u32) {}`).".to_string());
 
@@ -258,20 +258,21 @@ impl JsonSchema for AbiType {
         "AbiType".to_string()
     }
 
-    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+    fn json_schema(schema_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
         let mut json_abi_type = schemars::schema::SchemaObject::default();
         let json_abi_schema = json_abi_type.object();
         json_abi_schema
             .properties
             .insert("serialization_type".to_string(), {
-                let schema = <String as JsonSchema>::json_schema(gen);
+                let schema = <String as JsonSchema>::json_schema(schema_gen);
                 let mut schema = schema.into_object();
                 schema.enum_values = Some(vec!["json".into()]);
                 schema.into()
             });
-        json_abi_schema
-            .properties
-            .insert("type_schema".to_string(), gen.subschema_for::<Schema>());
+        json_abi_schema.properties.insert(
+            "type_schema".to_string(),
+            schema_gen.subschema_for::<Schema>(),
+        );
         json_abi_schema
             .required
             .insert("serialization_type".to_string());
@@ -283,7 +284,7 @@ impl JsonSchema for AbiType {
         borsh_abi_schema
             .properties
             .insert("serialization_type".to_string(), {
-                let schema = <String as JsonSchema>::json_schema(gen);
+                let schema = <String as JsonSchema>::json_schema(schema_gen);
                 let mut schema = schema.into_object();
                 schema.enum_values = Some(vec!["borsh".into()]);
                 schema.into()
@@ -784,8 +785,9 @@ mod tests {
         "#;
         let err = serde_json::from_str::<AbiRoot>(json)
             .expect_err("Expected deserialization to fail due to schema version mismatch");
-        assert!(err
-            .to_string()
-            .contains("got 99.99.99: consider upgrading near-abi to a newer version"));
+        assert!(
+            err.to_string()
+                .contains("got 99.99.99: consider upgrading near-abi to a newer version")
+        );
     }
 }
