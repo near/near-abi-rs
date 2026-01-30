@@ -803,4 +803,100 @@ mod tests {
                 .contains("got 99.99.99: consider upgrading near-abi to a newer version")
         );
     }
+
+    #[test]
+    fn test_backward_compat_old_definitions_format() {
+        // Test that old ABI files using "definitions" (draft-07) can still be deserialized
+        let old_format_json = format!(
+            r#"
+            {{
+                "schema_version": "{}",
+                "metadata": {{}},
+                "body": {{
+                    "functions": [],
+                    "root_schema": {{
+                        "$schema": "http://json-schema.org/draft-07/schema#",
+                        "definitions": {{
+                            "TestType": {{
+                                "type": "string"
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+            "#,
+            SCHEMA_VERSION
+        );
+
+        let abi: AbiRoot = serde_json::from_str(&old_format_json)
+            .expect("Should be able to deserialize old ABI format with definitions");
+
+        // Verify the schema is preserved correctly
+        let schema_value = abi.body.root_schema.to_value();
+        assert!(schema_value.get("definitions").is_some());
+        assert!(schema_value.get("$defs").is_none());
+    }
+
+    #[test]
+    fn test_backward_compat_new_defs_format() {
+        // Test that new ABI files using "$defs" (draft-2020-12) work correctly
+        let new_format_json = format!(
+            r#"
+            {{
+                "schema_version": "{}",
+                "metadata": {{}},
+                "body": {{
+                    "functions": [],
+                    "root_schema": {{
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "$defs": {{
+                            "TestType": {{
+                                "type": "string"
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+            "#,
+            SCHEMA_VERSION
+        );
+
+        let abi: AbiRoot = serde_json::from_str(&new_format_json)
+            .expect("Should be able to deserialize new ABI format with $defs");
+
+        // Verify the schema is preserved correctly
+        let schema_value = abi.body.root_schema.to_value();
+        assert!(schema_value.get("$defs").is_some());
+        assert!(schema_value.get("definitions").is_none());
+    }
+
+    #[test]
+    fn test_backward_compat_roundtrip_preserves_format() {
+        // Ensure round-trip serialization preserves the original format
+        let old_format_json = format!(
+            r#"{{
+                "schema_version": "{}",
+                "metadata": {{}},
+                "body": {{
+                    "functions": [],
+                    "root_schema": {{
+                        "definitions": {{
+                            "MyType": {{"type": "integer"}}
+                        }}
+                    }}
+                }}
+            }}"#,
+            SCHEMA_VERSION
+        );
+
+        let abi: AbiRoot = serde_json::from_str(&old_format_json).unwrap();
+        let reserialized = serde_json::to_string(&abi).unwrap();
+        let abi2: AbiRoot = serde_json::from_str(&reserialized).unwrap();
+
+        // Verify the schema structure is preserved
+        let schema1 = abi.body.root_schema.to_value();
+        let schema2 = abi2.body.root_schema.to_value();
+        assert_eq!(schema1, schema2);
+        assert!(schema2.get("definitions").is_some());
+    }
 }
