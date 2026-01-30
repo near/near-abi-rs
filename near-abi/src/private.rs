@@ -1,6 +1,7 @@
 use super::{
-    ensure_current_version, AbiBody, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION,
+    AbiBody, AbiFunction, AbiMetadata, AbiRoot, SCHEMA_VERSION, Schema, ensure_current_version,
 };
+use schemars::SchemaGenerator;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -15,7 +16,7 @@ pub struct ChunkedAbiEntry {
 }
 
 impl ChunkedAbiEntry {
-    pub fn new(functions: Vec<AbiFunction>, root_schema: RootSchema) -> ChunkedAbiEntry {
+    pub fn new(functions: Vec<AbiFunction>, root_schema: Schema) -> ChunkedAbiEntry {
         Self {
             schema_version: SCHEMA_VERSION.to_string(),
             body: AbiBody {
@@ -31,8 +32,8 @@ impl ChunkedAbiEntry {
         let mut schema_version = None;
         let mut functions = Vec::<AbiFunction>::new();
 
-        let mut gen = schemars::gen::SchemaGenerator::default();
-        let definitions = gen.definitions_mut();
+        let mut schema_gen = SchemaGenerator::default();
+        let definitions = schema_gen.definitions_mut();
 
         let mut unexpected_versions = std::collections::BTreeSet::new();
 
@@ -48,7 +49,18 @@ impl ChunkedAbiEntry {
             }
 
             // Update resulting JSON Schema
-            definitions.extend(entry.body.root_schema.definitions.to_owned());
+            // In schemars 1.x, definitions are stored in $defs within the schema value
+            let schema_value = entry.body.root_schema.to_value();
+            if let serde_json::Value::Object(map) = schema_value {
+                if let Some(serde_json::Value::Object(defs)) = map.get("$defs") {
+                    for (k, v) in defs {
+                        definitions.insert(
+                            k.clone().into(),
+                            serde_json::from_value(v.clone()).unwrap_or_default(),
+                        );
+                    }
+                }
+            }
 
             // Update resulting function list
             functions.extend(entry.body.functions);
@@ -70,7 +82,7 @@ impl ChunkedAbiEntry {
             schema_version: schema_version.unwrap(),
             body: AbiBody {
                 functions,
-                root_schema: gen.into_root_schema_for::<String>(),
+                root_schema: schema_gen.into_root_schema_for::<String>(),
             },
         })
     }
