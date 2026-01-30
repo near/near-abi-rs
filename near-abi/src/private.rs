@@ -54,10 +54,7 @@ impl ChunkedAbiEntry {
             if let serde_json::Value::Object(map) = schema_value {
                 if let Some(serde_json::Value::Object(defs)) = map.get("$defs") {
                     for (k, v) in defs {
-                        definitions.insert(
-                            k.clone().into(),
-                            serde_json::from_value(v.clone()).unwrap_or_default(),
-                        );
+                        definitions.insert(k.clone(), v.clone());
                     }
                 }
             }
