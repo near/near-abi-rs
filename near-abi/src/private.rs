@@ -1,5 +1,5 @@
 use super::{
-    ensure_current_version, AbiBody, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION,
+    AbiBody, AbiFunction, AbiMetadata, AbiRoot, RootSchema, SCHEMA_VERSION, ensure_current_version,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -31,8 +31,8 @@ impl ChunkedAbiEntry {
         let mut schema_version = None;
         let mut functions = Vec::<AbiFunction>::new();
 
-        let mut gen = schemars::gen::SchemaGenerator::default();
-        let definitions = gen.definitions_mut();
+        let mut schema_gen = schemars::r#gen::SchemaGenerator::default();
+        let definitions = schema_gen.definitions_mut();
 
         let mut unexpected_versions = std::collections::BTreeSet::new();
 
@@ -70,7 +70,7 @@ impl ChunkedAbiEntry {
             schema_version: schema_version.unwrap(),
             body: AbiBody {
                 functions,
-                root_schema: gen.into_root_schema_for::<String>(),
+                root_schema: schema_gen.into_root_schema_for::<String>(),
             },
         })
     }

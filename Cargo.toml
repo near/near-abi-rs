@@ -3,4 +3,4 @@ members = [
     "near-abi",
     "metaschema"
 ]
-resolver = "2"
+resolver = "3"
