@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5](https://github.com/near/near-abi-rs/compare/near-abi-v0.4.4...near-abi-v0.4.5) - 2026-02-17
+
+### Other
+
+- update to Rust edition 2024 and schemars 0.8.22 ([#40](https://github.com/near/near-abi-rs/pull/40))
+
 ## [0.4.4](https://github.com/near/near-abi-rs/compare/near-abi-v0.4.3...near-abi-v0.4.4) - 2025-11-28
 
 ### Fixed
